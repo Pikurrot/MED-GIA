@@ -16,25 +16,15 @@ def train(model, loss_function, optimizer, dataset, num_epochs=10):
 	:param num_epochs: The number of epochs to train for
 	"""
 	for epoch in range(num_epochs):
-		# Set the model to training mode
 		model.train()
-		# Initialize the total loss for this epoch
 		total_loss = 0
-		# Iterate over the dataset
-		for i, (data, _) in enumerate(dataset):
-			# Zero the gradients
+		for i, data in enumerate(dataset):
 			optimizer.zero_grad()
-			# Forward pass
 			output = model(data)
-			# Calculate the loss
 			loss = loss_function(output, data)
-			# Backward pass
 			loss.backward()
-			# Optimize
 			optimizer.step()
-			# Add the loss to the total loss
 			total_loss += loss.item()
-		# Print the average loss for this epoch
 		print(f"Epoch {epoch + 1}, Loss: {total_loss / len(dataset)}")
 
 if __name__ == "__main__":
