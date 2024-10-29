@@ -10,7 +10,7 @@ class Autoencoder(torch.nn.Module):
         self.encoder = torch.nn.Sequential(
             # Input = (Batch_size, C, W, H) 
             # (Batch_size, C, W, H) -> (Batch_size, 16, W/2, H/2) 
-            nn.Conv2d(3, 16, kernel_size = 3, stride=2, padding=1),
+            nn.Conv2d(4, 16, kernel_size = 3, stride=2, padding=1),
             nn.ReLU(),
             
             # (Batch_size, 16, W/2, H/2) -> (Batch_size, 32, W/4, H/4)
@@ -50,8 +50,8 @@ class Autoencoder(torch.nn.Module):
             nn.ConvTranspose2d(32, 16, kernel_size = 3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
 
-             # (Batch_size, 16, W/2, H/2) -> (Batch_size, 3, W, H)
-            nn.ConvTranspose2d(16, 3, kernel_size = 3, stride=2, padding=1, output_padding=1),
+             # (Batch_size, 16, W/2, H/2) -> (Batch_size, 4, W, H)
+            nn.ConvTranspose2d(16, 4, kernel_size = 3, stride=2, padding=1, output_padding=1),
         
         )
     
