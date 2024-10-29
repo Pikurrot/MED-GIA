@@ -5,6 +5,7 @@ from Autoencoder import Autoencoder
 from utils import HelicoDatasetAnomalyDetection
 
 
+
 def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 	"""
 	Train the model on the given dataset for the specified number of epochs.
@@ -41,4 +42,3 @@ if __name__ == "__main__":
 	train(model, loss_function, optimizer, dataset, device)
 	# Save the model
 	torch.save(model.state_dict(), "model.pth")
-	
