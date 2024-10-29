@@ -6,6 +6,7 @@ import pandas as pd
 import yaml
 
 default_path = "/fhome/vlia/HelicoDataSet"
+confg_path = "../config.yml"
 
 def ensure_dataset_path_yaml() -> int:
 	"""
@@ -13,15 +14,15 @@ def ensure_dataset_path_yaml() -> int:
 	:return: 0 if path is valid, 1 if path is not present, 2 if path is invalid
 	"""
 	# Check config.yml exists
-	if not os.path.exists("config.yml"):
-		with open("config.yml", "w") as file:
+	if not os.path.exists(confg_path):
+		with open(confg_path, "w") as file:
 			file.write(f"dataset_path: {default_path}")
 		return 1
 	# Check dataset_path exists
-	with open("config.yml", "r") as file:
+	with open(confg_path, "r") as file:
 		config = yaml.safe_load(file)
 	if "dataset_path" not in config:
-		with open("config.yml", "a") as file:
+		with open(confg_path, "a") as file:
 			file.write(f"dataset_path: {default_path}")
 		return 1
 	# Check if its valid
