@@ -4,6 +4,7 @@ from PIL import Image
 import os
 import pandas as pd
 import yaml
+from torchvision import transforms
 
 default_path = "/fhome/vlia/HelicoDataSet"
 confg_path = "../config.yml"
@@ -102,7 +103,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return Image.open(self.paths_patches[index])
+		return transforms.ToTensor()(Image.open(self.paths_patches[index]))
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
