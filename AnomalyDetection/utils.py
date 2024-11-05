@@ -61,7 +61,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 			raise FileNotFoundError("Dataset path in config.yml is invalid.")"""
 		
 		#self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
-		self.dataset_path = default_path
+		self.dataset_path = "/media/eric/D/datasets/HelicoDataSet"#default_path
 		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
 		self.cropped_path = os.path.join(self.dataset_path, "CrossValidation", "Cropped")
 		self.excel_file_path = os.path.join(self.dataset_path, "HP_WSI-CoordCroppedPatches.xlsx")
@@ -106,7 +106,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return transforms.ToTensor()(Image.open(self.paths_patches[index]))
+		return transforms.Resize((256, 256))(transforms.ToTensor()(Image.open(self.paths_patches[index])))
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
