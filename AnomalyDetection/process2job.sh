@@ -13,4 +13,4 @@ sleep 3
 
 # Change to your user home folder in the cluster.
 
-python /fhome/vlia01/MED-GIA/Anomaly_Detection/train.py
+python /fhome/vlia01/MED-GIA/AnomalyDetection/train.py
