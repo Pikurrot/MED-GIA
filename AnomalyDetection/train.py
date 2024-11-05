@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from Autoencoder import Autoencoder 
 from utils import HelicoDatasetAnomalyDetection
+from torch.utils.data import DataLoader
 
 
 
@@ -17,13 +18,16 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 	:param num_epochs: The number of epochs to train for
 	"""
 	model = model.to(device) 
+	dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
 	for epoch in range(num_epochs):
 		model.train()
 		total_loss = 0
-		for i, data in enumerate(dataset): # Data is a tensor (B, C, H, W)
+		print(len(dataloader))
+		for i, data in enumerate(dataloader): # Data is a tensor (B, C, H, W)
 			optimizer.zero_grad()
 			data = data.to(device)
 			output = model(data)
+			print(output.shape, data.shape)
 			loss = loss_function(output, data)
 			loss.backward()
 			optimizer.step()
