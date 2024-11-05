@@ -59,6 +59,6 @@ class Autoencoder(torch.nn.Module):
     def forward(self, x) -> torch.Tensor:
 
         self.encoded  = self.encoder(x)
-        self.bottleneck = self.bottleneck(self.encoded)
-        self.decoded = self.decoder(self.bottleneck)
+        self.intermediate_step = self.bottleneck(self.encoded)
+        self.decoded = self.decoder(self.intermediate_step)
         return self.decoded
