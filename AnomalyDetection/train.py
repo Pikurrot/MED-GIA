@@ -38,6 +38,7 @@ if __name__ == "__main__":
 	loss_function = nn.MSELoss()
 	optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	print(f"Using device {device}")
 	# Train the model
 	train(model, loss_function, optimizer, dataset, device)
 	# Save the model
