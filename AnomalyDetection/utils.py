@@ -7,7 +7,7 @@ import yaml
 from torchvision import transforms
 
 default_path = "/fhome/vlia/HelicoDataSet"
-confg_path = "../config.yml"
+config_path = "config.yml"
 
 def ensure_dataset_path_yaml() -> int:
 	"""
@@ -15,20 +15,33 @@ def ensure_dataset_path_yaml() -> int:
 	:return: 0 if path is valid, 1 if path is not present, 2 if path is invalid
 	"""
 	# Check config.yml exists
-	if not os.path.exists(confg_path):
-		with open(confg_path, "w") as file:
-			file.write(f"dataset_path: {default_path}")
+	config = {}
+
+	# Check if config.yml exists
+	if not os.path.exists(config_path):
+		config["dataset_path"] = default_path
+		with open(config_path, "w") as file:
+			yaml.safe_dump(config, file)
 		return 1
-	# Check dataset_path exists
-	with open(confg_path, "r") as file:
-		config = yaml.safe_load(file)
+
+	# Load existing config
+	try:
+		with open(config_path, "r") as file:
+			config = yaml.safe_load(file) or {}
+	except yaml.YAMLError as e:
+		raise ValueError(f"Error parsing {config_path}: {e}")
+
+	# Check if 'dataset_path' exists in config
 	if "dataset_path" not in config:
-		with open(confg_path, "a") as file:
-			file.write(f"dataset_path: {default_path}")
+		config["dataset_path"] = default_path
+		with open(config_path, "w") as file:
+			yaml.safe_dump(config, file)
 		return 1
-	# Check if its valid
+
+	# Check if the dataset path exists on the filesystem
 	if not os.path.exists(config["dataset_path"]):
 		return 2
+
 	return 0
 
 def listdir(path: str, filter: str = None, extension: str = None) -> list:
@@ -57,11 +70,10 @@ class HelicoDatasetAnomalyDetection(Dataset):
 			if not os.path.exists(default_path):
 				raise FileNotFoundError(f"Default path {default_path} does not exist. Specify a valid path in config.yml.")
 		elif path_error == 2:
-			raise FileNotFoundError("Dataset path in config.yml is invalid.")
+			current_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+			raise FileNotFoundError(f"Dataset path {current_path} does not exist. Specify a valid path in config.yml.")
 		
 		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
-		# "/media/eric/D/datasets/HelicoDataSet"
-		# self.dataset_path = default_path
 		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
 		self.cropped_path = os.path.join(self.dataset_path, "CrossValidation", "Cropped")
 		self.excel_file_path = os.path.join(self.dataset_path, "HP_WSI-CoordCroppedPatches.xlsx")
