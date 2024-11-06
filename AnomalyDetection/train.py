@@ -19,15 +19,14 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 	"""
 	model = model.to(device) 
 	dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+	print("Starting training")
 	for epoch in range(num_epochs):
 		model.train()
 		total_loss = 0
-		print(len(dataloader))
 		for i, data in enumerate(dataloader): # Data is a tensor (B, C, H, W)
 			optimizer.zero_grad()
 			data = data.to(device)
 			output = model(data)
-			print(output.shape, data.shape)
 			loss = loss_function(output, data)
 			loss.backward()
 			optimizer.step()
