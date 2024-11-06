@@ -164,3 +164,8 @@ data
 # Custom
 config.yml
 *.pth
+*.pt
+*.pkl
+*.safetensors
+*.err
+*.log
