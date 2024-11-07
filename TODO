@@ -1,0 +1,6 @@
+Anomaly Detection
+[] Remove alpha channel
+[] Do normalization in preprocessing
+[] Implement threshold for patient diagnosis (ROC curve)
+[] Make model bigger (+layers, +neurons) OR/AND use pretrained model and finetune
+[] Do grid search to find best parameters
