@@ -2,5 +2,7 @@ Anomaly Detection
 [] Remove alpha channel
 [] Do normalization in preprocessing
 [] Implement threshold for patient diagnosis (ROC curve)
-[] Make model bigger (+layers, +neurons) OR/AND use pretrained model and finetune
+[] Make model bigger (+layers, +neurons)
+[] Use pretrained model and finetune it (maybe we can take resnet except last classification layer and use it as encoder,
+	then freeze it and train a decoder, or not freeze and let it finetune)
 [] Do grid search to find best parameters
