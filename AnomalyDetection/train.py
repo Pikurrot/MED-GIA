@@ -38,8 +38,9 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 
 if __name__ == "__main__":
 	# Initialize wandb
-	wandb.init(project="autoencoder-training")
-
+	wandb.login(key="07313fef21f9b32f2fb1fb00a2672258c8b5c3d4")
+	wandb.init(project="MED-GIA")
+	
 	# Set hyperparameters
 	wandb.config = {
 		"learning_rate": 0.001,
