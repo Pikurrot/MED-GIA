@@ -6,6 +6,7 @@ from torch import nn
 class Autoencoder(torch.nn.Module):
     
     def __init__(self):
+
         super().__init__()
         self.encoder = torch.nn.Sequential(
             # Input = (Batch_size, C, W, H) 
@@ -63,3 +64,6 @@ class Autoencoder(torch.nn.Module):
         self.intermediate_step = self.bottleneck(self.encoded)
         self.decoded = self.decoder(self.intermediate_step)
         return self.decoded
+    
+
+
