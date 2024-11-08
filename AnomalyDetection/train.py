@@ -5,6 +5,7 @@ import wandb
 from Autoencoder import Autoencoder 
 from utils import HelicoDatasetAnomalyDetection
 from torch.utils.data import DataLoader
+from Autoencoder_big import Autoencoder_Modified
 
 
 
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 	# Load the dataset
 	dataset = HelicoDatasetAnomalyDetection()
 	# Initialize the model
-	model = Autoencoder()
+	model = Autoencoder_Modified()
 	loss_function = nn.MSELoss()
 	# No se si tiene mucho sentido probar con distintos optimizadores que no sean Adam
 	# optimizer = torch.optim.SGD(model.parameters(), lr=wandb.config.learning_rate)
