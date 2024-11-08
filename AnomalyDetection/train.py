@@ -19,7 +19,7 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 	:param num_epochs: The number of epochs to train for
 	"""
 	model = model.to(device) 
-	dataloader = DataLoader(dataset, batch_size=wandb.config.batch_size, shuffle=True)
+	dataloader = DataLoader(dataset, batch_size=wandb.config["batch_size"], shuffle=True)
 	print("Starting training")
 	for epoch in range(num_epochs):
 		model.train()
