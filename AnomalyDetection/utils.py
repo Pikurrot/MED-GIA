@@ -118,7 +118,8 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return transforms.Resize((256, 256))(transforms.ToTensor()(Image.open(self.paths_patches[index])))
+		image = Image.open(self.paths_patches[index]).convert('RGB')
+		return transforms.Resize((256, 256))(transforms.ToTensor()(image)) # (3, H, W)
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
