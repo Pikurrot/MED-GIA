@@ -1,8 +1,16 @@
 Anomaly Detection
-[] Remove alpha channel
+[x] Remove alpha channel
 [] Do normalization in preprocessing
 [] Implement threshold for patient diagnosis (ROC curve)
 [] Make model bigger (+layers, +neurons)
 [] Use pretrained model and finetune it (maybe we can take resnet except last classification layer and use it as encoder,
 	then freeze it and train a decoder, or not freeze and let it finetune)
 [] Do grid search to find best parameters
+
+
+Questions:
+- is resnet finetunning a good approach?
+- how to do ROC curve with threshold once we have the red fractions
+- when do we use HoldOut dataset
+- Use MSE or another? (Structural Similarity Loss (SSIM))
+- Makes sense using a VAE?
