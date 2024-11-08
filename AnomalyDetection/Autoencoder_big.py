@@ -1,5 +1,5 @@
 import torch 
-from torch.functional import FA 
+from torch.functional import F
 from torch import nn
 
 class Autoencoder_Modified(nn.Module):
