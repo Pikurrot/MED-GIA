@@ -60,6 +60,14 @@ def listdir(path: str, filter: str = None, extension: str = None) -> list:
 		directories = [directory for directory in directories if directory.endswith(extension)]
 	return directories
 
+def transform_image(image: Image, size: tuple) -> Image:
+	transformations = transforms.Compose([
+		transforms.Resize(size),
+		transforms.ToTensor(),
+		transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+	])
+	return transformations(image)
+
 class HelicoDatasetAnomalyDetection(Dataset):
 	def __init__(self) -> None:
 		super().__init__()
@@ -117,7 +125,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return transforms.Resize((256, 256))(transforms.ToTensor()(Image.open(self.paths_patches[index])))
+		return transform_image(Image.open(self.paths_patches[index]))
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
@@ -175,7 +183,7 @@ class HelicoDatasetClassification(Dataset):
 		
 	def __getitem__(self, index) -> Any:
 		path, label = self.paths_labels[index]
-		return transforms.Resize((256, 256))(transforms.ToTensor()(Image.open(path))), label
+		return transform_image(Image.open(path)), label
 	
 	def __len__(self) -> int:
 		return len(self.paths_labels)
