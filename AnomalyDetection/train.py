@@ -58,11 +58,11 @@ if __name__ == "__main__":
 	# optimizer = torch.optim.SGD(model.parameters(), lr=wandb.config.learning_rate)
 	# optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config.learning_rate)
 	# optimizer = torch.optim.RMSprop(model.parameters(), lr=wandb.config.learning_rate)
-	optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config.learning_rate)
+	optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["learning_rate"])
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	print(f"Using device {device}")
 	# Train the model
-	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config.epochs)
+	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config["epochs"])
 	# Save the model
 	torch.save(model.state_dict(), "model.pth")
 	wandb.save("model.pth")
