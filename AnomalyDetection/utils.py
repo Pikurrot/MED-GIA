@@ -125,7 +125,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return transform_image(Image.open(self.paths_patches[index]))
+		return transform_image(Image.open(self.paths_patches[index]).convert("RGB"), (256, 256))
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
@@ -183,7 +183,7 @@ class HelicoDatasetClassification(Dataset):
 		
 	def __getitem__(self, index) -> Any:
 		path, label = self.paths_labels[index]
-		return transform_image(Image.open(path)), label
+		return transform_image(Image.open(path).convert("RGB"), (256, 256)), label
 	
 	def __len__(self) -> int:
 		return len(self.paths_labels)
