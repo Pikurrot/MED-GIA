@@ -12,8 +12,8 @@
 sleep 3
 
 # Remove all .out and .err files
-rm /fhome/vlia01/MED-GIA/*.out
-rm /fhome/vlia01/MED-GIA/*.err
+# rm /fhome/vlia01/MED-GIA/*.out
+# rm /fhome/vlia01/MED-GIA/*.err
 
 # Run the train script
 python /fhome/vlia01/MED-GIA/AnomalyDetection/train.py
