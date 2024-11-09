@@ -1,53 +1,50 @@
-import torch 
-from torch.functional import F
+import torch
 from torch import nn
 
-class Autoencoder_Modified(nn.Module):
+class ImprovedAutoencoder(nn.Module):
+    
     def __init__(self):
-        super(Autoencoder_Modified, self).__init__()
-
-        # Encoder
+        super().__init__()
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, padding=1),  # (Batch_size, 3, H, W) -> (Batch_size, 16, H, W)
+            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
-            nn.MaxPool2d(2),  # (Batch_size, 16, H, W) -> (Batch_size, 16, H/2, W/2)
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),  # (Batch_size, 16, H/2, W/2) -> (Batch_size, 32, H/2, W/2)
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.MaxPool2d(2),  # (Batch_size, 32, H/2, W/2) -> (Batch_size, 32, H/4, W/4)
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),  # (Batch_size, 32, H/4, W/4) -> (Batch_size, 64, H/4, W/4)
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool2d(2),  # (Batch_size, 64, H/4, W/4) -> (Batch_size, 64, H/8, W/8)
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),  # (Batch_size, 64, H/8, W/8) -> (Batch_size, 128, H/8, W/8)
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.MaxPool2d(2),  # (Batch_size, 128, H/8, W/8) -> (Batch_size, 128, H/16, W/16)
         )
-
-        # Bottleneck
+        
         self.bottleneck = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),  # (Batch_size, 128, H/16, W/16) -> (Batch_size, 128, H/16, W/16)
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),  # (Batch_size, 128, H/16, W/16) -> (Batch_size, 128, H/16, W/16)
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
             nn.ReLU(),
         )
-
-        # Decoder
+        
         self.decoder = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),  # (Batch_size, 128, H/16, W/16) -> (Batch_size, 128, H/8, W/8)
-            nn.Conv2d(128, 64, kernel_size=3, padding=1),  # (Batch_size, 128, H/8, W/8) -> (Batch_size, 64, H/8, W/8)
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),  # (Batch_size, 64, H/8, W/8) -> (Batch_size, 64, H/4, W/4)
-            nn.Conv2d(64, 32, kernel_size=3, padding=1),  # (Batch_size, 64, H/4, W/4) -> (Batch_size, 32, H/4, W/4)
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),  # (Batch_size, 32, H/4, W/4) -> (Batch_size, 32, H/2, W/2)
-            nn.Conv2d(32, 16, kernel_size=3, padding=1),  # (Batch_size, 32, H/2, W/2) -> (Batch_size, 16, H/2, W/2)
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),  # (Batch_size, 16, H/2, W/2) -> (Batch_size, 16, H, W)
-            nn.Conv2d(16, 3, kernel_size=3, padding=1),  # (Batch_size, 16, H, W) -> (Batch_size, 3, H, W)
-            nn.Sigmoid()
+            nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.Sigmoid(),  # Use Sigmoid to ensure the output is between 0 and 1
         )
-
-    def forward(self, x):
+    
+    def forward(self, x) -> torch.Tensor:
         encoded = self.encoder(x)
-        bottleneck_output = self.bottleneck(encoded)
-        decoded = self.decoder(bottleneck_output)
+        intermediate_step = self.bottleneck(encoded)
+        decoded = self.decoder(intermediate_step)
         return decoded
