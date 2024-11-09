@@ -33,6 +33,7 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 			loss.backward()
 			optimizer.step()
 			total_loss += loss.item()
+			wandb.log({"batch_loss": loss.item()})
 		avg_loss = total_loss / len(dataset)
 		print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
 		wandb.log({"epoch": epoch + 1, "loss": avg_loss})
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 	# Set hyperparameters
 	wandb.config = {
 		"learning_rate": 0.001,
-		"epochs": 1,
+		"epochs": 5,
 		"batch_size": 256,
 		"optimizer" : "adam"
 	}
