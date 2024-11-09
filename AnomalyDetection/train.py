@@ -5,7 +5,7 @@ import wandb
 from Autoencoder import Autoencoder 
 from utils import HelicoDatasetAnomalyDetection
 from torch.utils.data import DataLoader
-from Autoencoder_big import Autoencoder_Modified
+from Autoencoder_big import ImprovedAutoencoder
 
 
 
@@ -68,5 +68,5 @@ if __name__ == "__main__":
 	# Train the model
 	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config["epochs"])
 	# Save the model
-	torch.save(model.state_dict(), "AutoenCoder.pth")
-	wandb.save("Autoencoder.pth")
+	torch.save(model.state_dict(), "ImprovedAutoencoder.pth")
+	wandb.save("ImprovedAutoencoder.pth")
