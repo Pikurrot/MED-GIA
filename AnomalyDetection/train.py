@@ -45,7 +45,7 @@ if __name__ == "__main__":
 	# Set hyperparameters
 	wandb.config = {
 		"learning_rate": 0.001,
-		"epochs": 8,
+		"epochs": 1,
 		"batch_size": 256,
 		"optimizer" : "adam"
 	}
