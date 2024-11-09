@@ -52,7 +52,6 @@ coverage.xml
 cover/
 
 # Translations
-*.mo
 *.pot
 
 # Django stuff:
@@ -163,7 +162,6 @@ data
 
 # Custom
 config.yml
-*.pth
 *.pt
 *.pkl
 *.safetensors
