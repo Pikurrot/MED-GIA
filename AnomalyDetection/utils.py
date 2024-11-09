@@ -64,7 +64,7 @@ def transform_image(image: Image, size: tuple) -> Image:
 	transformations = transforms.Compose([
 		transforms.Resize(size),
 		transforms.ToTensor(),
-		# transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	])
 	return transformations(image)
 
