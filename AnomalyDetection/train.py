@@ -68,5 +68,6 @@ if __name__ == "__main__":
 	# Train the model
 	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config["epochs"])
 	# Save the model
-	torch.save(model.state_dict(), "ImprovedAutoencoder.pth")
-	wandb.save("ImprovedAutoencoder.pth")
+	model_name = "Autoencoder.pth"
+	torch.save(model.state_dict(), model_name)
+	wandb.save(model_name)
