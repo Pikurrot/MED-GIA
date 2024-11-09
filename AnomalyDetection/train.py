@@ -50,6 +50,9 @@ if __name__ == "__main__":
 		"optimizer" : "adam"
 	}
 
+	print("num_epochs: ", wandb.config["epochs"])
+	print("batch_size: ", wandb.config["batch_size"])
+	print("learning_rate: ", wandb.config["learning_rate"])
 	# Load the dataset
 	dataset = HelicoDatasetAnomalyDetection()
 	# Initialize the model
