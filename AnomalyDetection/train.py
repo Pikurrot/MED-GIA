@@ -33,6 +33,7 @@ def train(model, loss_function, optimizer, dataset, device, num_epochs=10):
 			loss.backward()
 			optimizer.step()
 			total_loss += loss.item()
+			wandb.log({"batch_loss": loss.item()})
 		avg_loss = total_loss / len(dataset)
 		print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
 		wandb.log({"epoch": epoch + 1, "loss": avg_loss})
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 	# Set hyperparameters
 	wandb.config = {
 		"learning_rate": 0.001,
-		"epochs": 8,
+		"epochs": 2,
 		"batch_size": 256,
 		"optimizer" : "adam"
 	}
@@ -68,5 +69,6 @@ if __name__ == "__main__":
 	# Train the model
 	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config["epochs"])
 	# Save the model
-	torch.save(model.state_dict(), "ImprovedAutoencoder.pth")
-	wandb.save("ImprovedAutoencoder.pth")
+	model_name = "Autoencoder.pth"
+	torch.save(model.state_dict(), model_name)
+	wandb.save(model_name)

@@ -167,4 +167,5 @@ config.yml
 *.safetensors
 *.err
 *.log
+*.out
 wandb/
