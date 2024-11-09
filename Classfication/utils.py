@@ -173,10 +173,13 @@ class HelicoDatasetClassification(Dataset):
 			path_label = os.path.dirname(path_label_tup[0])
 			for path in paths:
 				if path_label == path[:-2]:
-					basename = os.path.basename(path_label_tup[0]).zfill(9)
-					path_append = os.path.join(path, basename)
+					basename = os.path.splitext(os.path.basename(path_label_tup[0]))[0].zfill(5)
+					listed_basenames = listdir(path)
+					actual_basenames = [listed_basename for listed_basename in listed_basenames if listed_basename.startswith(basename)]
 					label_append = path_label_tup[1]
-					actual_paths.append((path_append, label_append))
+					for actual_basename in actual_basenames:
+						path_append = os.path.join(path, actual_basename)
+						actual_paths.append((path_append, label_append))
 					break
 
 		return actual_paths
@@ -187,7 +190,6 @@ class HelicoDatasetClassification(Dataset):
 	
 	def __len__(self) -> int:
 		return len(self.paths_labels)
-
 
 if __name__ == "__main__":
 	# dataset = HelicoDatasetAnomalyDetection()
