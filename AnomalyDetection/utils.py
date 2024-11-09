@@ -236,21 +236,45 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 		# patient_diagnosis to 0 or 1
 		patients_diagnosis = [0 if diagnosis == "NEGATIVA" else 1 for diagnosis in patients_diagnosis]
 
-		# fetch all the patient directories
-		patient_directories = []
-		for patient_id in patients_ids:
-			for patient_directory in listdir(self.holdout_path):
+		# Initialize empty lists to store valid patient data
+		valid_patient_ids = []
+		valid_patient_diagnosis = []
+		patient_paths = []
+
+		# Build a mapping from patient_id to diagnosis
+		patient_id_to_diagnosis = dict(zip(patients_ids, patients_diagnosis))
+
+		# Fetch all the patient directories and ensure alignment
+		for patient_directory in listdir(self.holdout_path):
+			for patient_id in patients_ids:
 				if patient_directory.startswith(patient_id):
-					patient_directories.append(patient_directory)
+					patient_paths.append(os.path.join(self.holdout_path, patient_directory))
+					valid_patient_ids.append(patient_id)
+					valid_patient_diagnosis.append(patient_id_to_diagnosis[patient_id])
 					break
-		patient_paths = [os.path.join(self.holdout_path, patient_directory) for patient_directory in patient_directories]
-		
-		# fetch all the patches from the patient directories
-		self.triplets = [] # (patch_path, patient_id, patient_diagnosis)
+
+		# Now, use valid_patient_ids and valid_patient_diagnosis for indexing
+		self.triplets = []  # (patch_path, patient_id, patient_diagnosis)
 		for i, patient_path in enumerate(patient_paths):
 			patches = listdir(patient_path, extension=".png")
 			for patch in patches:
-				self.triplets.append((os.path.join(patient_path, patch), patients_ids[i], patients_diagnosis[i]))
+				self.triplets.append((os.path.join(patient_path, patch), valid_patient_ids[i], valid_patient_diagnosis[i]))
+
+		# # fetch all the patient directories
+		# patient_directories = []
+		# for patient_id in patients_ids:
+		# 	for patient_directory in listdir(self.holdout_path):
+		# 		if patient_directory.startswith(patient_id):
+		# 			patient_directories.append(patient_directory)
+		# 			break
+		# patient_paths = [os.path.join(self.holdout_path, patient_directory) for patient_directory in patient_directories]
+		
+		# # fetch all the patches from the patient directories
+		# self.triplets = [] # (patch_path, patient_id, patient_diagnosis)
+		# for i, patient_path in enumerate(patient_paths):
+		# 	patches = listdir(patient_path, extension=".png")
+		# 	for patch in patches:
+		# 		self.triplets.append((os.path.join(patient_path, patch), patients_ids[i], patients_diagnosis[i]))
 
 	def __getitem__(self, index) -> Any:
 		path, patient_id, patient_diagnosis = self.triplets[index]
