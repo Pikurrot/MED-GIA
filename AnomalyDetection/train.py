@@ -45,7 +45,7 @@ if __name__ == "__main__":
 	# Set hyperparameters
 	wandb.config = {
 		"learning_rate": 0.001,
-		"epochs": 1,
+		"epochs": 8,
 		"batch_size": 256,
 		"optimizer" : "adam"
 	}
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 	# Load the dataset
 	dataset = HelicoDatasetAnomalyDetection()
 	# Initialize the model
-	model = Autoencoder_Modified()
+	model = Autoencoder()
 	loss_function = nn.MSELoss()
 	# No se si tiene mucho sentido probar con distintos optimizadores que no sean Adam
 	# optimizer = torch.optim.SGD(model.parameters(), lr=wandb.config.learning_rate)
@@ -68,5 +68,5 @@ if __name__ == "__main__":
 	# Train the model
 	train(model, loss_function, optimizer, dataset, device, num_epochs=wandb.config["epochs"])
 	# Save the model
-	torch.save(model.state_dict(), "AutoenCoderModified.pth")
-	wandb.save("AutoenCoderModified.pth")
+	torch.save(model.state_dict(), "AutoenCoder.pth")
+	wandb.save("Autoencoder.pth")
