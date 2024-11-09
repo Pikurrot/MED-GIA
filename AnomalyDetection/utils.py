@@ -69,7 +69,7 @@ def transform_image(image: Image, size: tuple) -> Image:
 	return transformations(image)
 
 class HelicoDatasetAnomalyDetection(Dataset):
-	def __init__(self) -> None:
+	def __init__(self, patient_id: bool=False) -> None:
 		super().__init__()
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
@@ -84,23 +84,29 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
 		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
 		self.cropped_path = os.path.join(self.dataset_path, "CrossValidation", "Cropped")
+		self.patient_id = patient_id
 
 		# Find all the negative diagnosis directories
 		paths_negatives = self.get_negative_diagnosis_directories(self.csv_file_path)
 		paths = [os.path.join(self.cropped_path, filename) for filename in listdir(self.cropped_path)]
 		actual_paths = []
+		patients_ids = []
 		for path_negative in paths_negatives:
 			for path in paths:
 				if path_negative == path[:-2]:
 					actual_paths.append(path)
+					if patient_id:
+						patients_ids.append(os.path.basename(path)[:-2])
 					break
 
 		# Retrieve all the patches from the directories
 		self.paths_patches = []
-		for directory in actual_paths:
+		self.patient_ids_patches = []
+		for i, directory in enumerate(actual_paths):
 			patches_names = listdir(directory, extension=".png")
 			patches_paths = [os.path.join(directory, patches_name) for patches_name in patches_names]
 			self.paths_patches.extend(patches_paths)
+			self.patient_ids_patches.extend([patients_ids[i]] * len(patches_paths))
 
 	def get_negative_diagnosis_directories(self, csv_path: str) -> list:
 		"""
@@ -125,14 +131,18 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		return directories
 
 	def __getitem__(self, index) -> Any:
-		return transform_image(Image.open(self.paths_patches[index]).convert("RGB"), (256, 256))
+		image = transform_image(Image.open(self.paths_patches[index]).convert("RGB"), (256, 256))
+		if self.patient_id:
+			return image, self.patient_ids_patches[index] # (image, patient_id)
+		else:
+			return image # (image,)
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
 
 
 class HelicoDatasetClassification(Dataset):
-	def __init__(self) -> None:
+	def __init__(self, patient_id: bool=False) -> None:
 		super().__init__()
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
@@ -147,6 +157,7 @@ class HelicoDatasetClassification(Dataset):
 		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
 		self.annotated_path = os.path.join(self.dataset_path, "CrossValidation", "Annotated")
 		self.excel_file_path = os.path.join(self.dataset_path, "HP_WSI-CoordAnnotatedPatches.xlsx")
+		self.patient_id = patient_id
 
 		self.paths_labels = self.get_paths_and_labels(self.annotated_path, self.excel_file_path)
 	
@@ -179,24 +190,82 @@ class HelicoDatasetClassification(Dataset):
 					label_append = path_label_tup[1]
 					for actual_basename in actual_basenames:
 						path_append = os.path.join(path, actual_basename)
-						actual_paths.append((path_append, label_append))
+						if self.patient_id:
+							actual_paths.append((path_append, label_append, os.path.basename(path)[:-2]))
+						else:
+							actual_paths.append((path_append, label_append))
 					break
 
 		return actual_paths
 		
 	def __getitem__(self, index) -> Any:
-		path, label = self.paths_labels[index]
-		return transform_image(Image.open(path).convert("RGB"), (256, 256)), label
+		if self.patient_id:
+			path, label, patient_id = self.paths_labels[index]
+			return transform_image(Image.open(path).convert("RGB"), (256, 256)), label, patient_id
+		else:
+			path, label = self.paths_labels[index]
+			return transform_image(Image.open(path).convert("RGB"), (256, 256)), label
 	
 	def __len__(self) -> int:
 		return len(self.paths_labels)
 
 
+class HelicoDatasetPatientDiagnosis(Dataset):
+	def __init__(self) -> None:
+		# Initialize paths
+		path_error = ensure_dataset_path_yaml()
+		if path_error == 1:
+			print(f"Dataset path not found in config.yml. Defaulting to {default_path}")
+			if not os.path.exists(default_path):
+				raise FileNotFoundError(f"Default path {default_path} does not exist. Specify a valid path in config.yml.")
+		elif path_error == 2:
+			current_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+			raise FileNotFoundError(f"Dataset path {current_path} does not exist. Specify a valid path in config.yml.")
+		
+		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
+		self.holdout_path = os.path.join(self.dataset_path, "HoldOut")
+
+		# Load the CSV file
+		csv = pd.read_csv(self.csv_file_path)
+		patients_ids = csv["CODI"].to_numpy()
+		patients_diagnosis = csv["DENSITAT"].to_numpy()
+		# remove BAIXA
+		patients_ids = patients_ids[patients_diagnosis != "BAIXA"]
+		patients_diagnosis = patients_diagnosis[patients_diagnosis != "BAIXA"]
+		# patient_diagnosis to 0 or 1
+		patients_diagnosis = [0 if diagnosis == "NEGATIVA" else 1 for diagnosis in patients_diagnosis]
+
+		# fetch all the patient directories
+		patient_directories = []
+		for patient_id in patients_ids:
+			for patient_directory in listdir(self.holdout_path):
+				if patient_directory.startswith(patient_id):
+					patient_directories.append(patient_directory)
+					break
+		patient_paths = [os.path.join(self.holdout_path, patient_directory) for patient_directory in patient_directories]
+		
+		# fetch all the patches from the patient directories
+		self.triplets = [] # (patch_path, patient_id, patient_diagnosis)
+		for i, patient_path in enumerate(patient_paths):
+			patches = listdir(patient_path, extension=".png")
+			for patch in patches:
+				self.triplets.append((os.path.join(patient_path, patch), patients_ids[i], patients_diagnosis[i]))
+
+	def __getitem__(self, index) -> Any:
+		path, patient_id, patient_diagnosis = self.triplets[index]
+		# returns (image, patient_id, patient_diagnosis)
+		return transform_image(Image.open(path).convert("RGB"), (256, 256)), patient_id, patient_diagnosis
+	
+	def __len__(self) -> int:
+		return len(self.triplets)
+
+
 if __name__ == "__main__":
 	# dataset = HelicoDatasetAnomalyDetection()
-	dataset = HelicoDatasetClassification()
+	dataset = HelicoDatasetPatientDiagnosis()
 	print(len(dataset))
-	print(dataset[0][0].shape, dataset[0][1])
+	print(dataset[0][0].shape, dataset[0][1], dataset[0][2])
 	# ensure all iterations work
 	for i in range(len(dataset)):
 		dataset[i]
