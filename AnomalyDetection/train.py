@@ -30,7 +30,7 @@ def train(model, loss_function, optimizer, scheduler, dataloader, device, num_ep
 			optimizer.step()
 			total_loss += loss.item()
 			wandb.log({"batch_loss": loss.item()})
-		avg_loss = total_loss / len(dataset)
+		avg_loss = total_loss / len(dataloader)
 		print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
 		wandb.log({"epoch": epoch + 1, "loss": avg_loss})
 		scheduler.step()
