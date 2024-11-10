@@ -5,9 +5,10 @@ from torch.utils.data import DataLoader
 from model import HelicobacterClassifier
 from utils import HelicoDatasetClassification
 from sklearn.model_selection import StratifiedKFold
+from collections import Counter
 
 
-def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10):
+def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10, patience=5, min_delta=0.01):
     """
     Train the model on the given dataset for the specified number of epochs.
 
@@ -17,9 +18,15 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
     :param train_loader: The training data loader
     :param val_loader: The validation data loader
     :param num_epochs: The number of epochs to train for
+    :param patience: The number of epochs to wait for improvement before stopping
+    :param min_delta: The minimum change in the monitored quantity to qualify as an improvement
     """
     model = model.to(device)
     print("Starting training")
+    
+    best_loss = float('inf')
+    patience_counter = 0
+    
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
@@ -36,6 +43,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
         wandb.log({"epoch": epoch + 1, "loss": avg_loss})
+        
         # Validation
         if val_loader is not None:
             model.eval()
@@ -57,6 +65,17 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             accuracy = 100 * correct / total
             print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Accuracy: {accuracy}%")
             wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss, "accuracy": accuracy})
+            # Check for improvement
+            if avg_val_loss < best_loss - min_delta:
+                best_loss = avg_val_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {epoch + 1}")
+                    break
+
+    print(f"Best validation loss: {best_loss}")
 
 if __name__ == "__main__":
     # Initialize wandb
@@ -66,7 +85,7 @@ if __name__ == "__main__":
     # Set hyperparameters
     wandb.config = {
         "learning_rate": 0.001,
-        "epochs": 8,
+        "epochs": 20,
         "batch_size": 256,
         "optimizer" : "adam",
         "k_folds": 5
@@ -83,6 +102,7 @@ if __name__ == "__main__":
     # Split the dataset into training and testing sets
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
+    torch.manual_seed(42)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
     k_folds = wandb.config["k_folds"]
@@ -95,6 +115,8 @@ if __name__ == "__main__":
     
     for fold, (train_idx, val_idx) in enumerate(stratified_kfold.split(train_dataset, train_labels)):
         print(f"FOLD {fold}")
+        print("Train label distribution:", Counter([train_labels[i] for i in train_idx]))
+        print("Validation label distribution:", Counter([train_labels[i] for i in val_idx]))
         print("--------------------------------")
         
         # Sample elements randomly from a given list of indices, no replacement.
