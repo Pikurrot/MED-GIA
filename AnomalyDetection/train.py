@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import wandb
-from Autoencoder import Autoencoder 
+# from Autoencoder import Autoencoder
+from Autoencoder_big import ImprovedAutoencoder
 from utils import HelicoDatasetAnomalyDetection
 from torch.utils.data import DataLoader
 
@@ -55,7 +56,8 @@ if __name__ == "__main__":
 	dataset = HelicoDatasetAnomalyDetection()
 	dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 	# Initialize the model
-	model = Autoencoder()
+	# model = Autoencoder()
+	model = ImprovedAutoencoder()
 	loss_function = nn.MSELoss()
 	optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["learning_rate"])
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
@@ -64,6 +66,6 @@ if __name__ == "__main__":
 	# Train the model
 	train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=wandb.config["epochs"])
 	# Save the model
-	model_name = "Autoencoder.pth"
+	model_name = "ImprovedAutoencoder.pth"
 	torch.save(model.state_dict(), model_name)
 	wandb.save(model_name)

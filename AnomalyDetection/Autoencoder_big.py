@@ -40,7 +40,7 @@ class ImprovedAutoencoder(nn.Module):
             nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.Sigmoid(),  # Use Sigmoid to ensure the output is between 0 and 1
+            nn.Tanh(),  # Use Sigmoid to ensure the output is between 0 and 1
         )
     
     def forward(self, x) -> torch.Tensor:
