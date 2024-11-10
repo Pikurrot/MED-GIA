@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
-import numpy as np
 import wandb
 from Autoencoder import Autoencoder 
 from utils import HelicoDatasetAnomalyDetection
 from torch.utils.data import DataLoader
 
-def train(model, loss_function, optimizer, scheduler, dataset, device, num_epochs=10):
+def train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=10):
 	"""
 	Train the model on the given dataset for the specified number of epochs.
 
@@ -18,7 +17,6 @@ def train(model, loss_function, optimizer, scheduler, dataset, device, num_epoch
 	:param num_epochs: The number of epochs to train for
 	"""
 	model = model.to(device) 
-	dataloader = DataLoader(dataset, batch_size=wandb.config["batch_size"], shuffle=True)
 	print("Starting training")
 	for epoch in range(num_epochs):
 		model.train()
@@ -55,6 +53,7 @@ if __name__ == "__main__":
 	print("learning_rate: ", wandb.config["learning_rate"])
 	# Load the dataset
 	dataset = HelicoDatasetAnomalyDetection()
+	dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 	# Initialize the model
 	model = Autoencoder()
 	loss_function = nn.MSELoss()
@@ -63,7 +62,7 @@ if __name__ == "__main__":
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	print(f"Using device {device}")
 	# Train the model
-	train(model, loss_function, optimizer, scheduler, dataset, device, num_epochs=wandb.config["epochs"])
+	train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=wandb.config["epochs"])
 	# Save the model
 	model_name = "Autoencoder.pth"
 	torch.save(model.state_dict(), model_name)
