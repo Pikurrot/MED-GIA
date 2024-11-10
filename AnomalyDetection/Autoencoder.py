@@ -1,5 +1,4 @@
 import torch 
-from torch.functional import F 
 from torch import nn
 
 # Autoencoder class input three channels
@@ -10,7 +9,6 @@ class Autoencoder(torch.nn.Module):
         self.encoder = torch.nn.Sequential(
             # Input = (Batch_size, C, W, H) 
             # (Batch_size, C, W, H) -> (Batch_size, 16, W/2, H/2) 
-            # TODO: remove alpha channel
             nn.Conv2d(3, 16, kernel_size = 3, stride=2, padding=1),
             nn.ReLU(),
             
