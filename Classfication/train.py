@@ -8,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 from collections import Counter
 
 
-def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10, patience=5, min_delta=0.01):
+def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10, patience=5, min_delta=0.01, fold=None):
     """
     Train the model on the given dataset for the specified number of epochs.
 
@@ -20,17 +20,18 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
     :param num_epochs: The number of epochs to train for
     :param patience: The number of epochs to wait for improvement before stopping
     :param min_delta: The minimum change in the monitored quantity to qualify as an improvement
+    :param fold: The current fold number (for saving models)
     """
     model = model.to(device)
     print("Starting training")
-    
     best_loss = float('inf')
     patience_counter = 0
+    best_model_path = f"best_model_fold{fold}.pth" if fold is not None else "best_model.pth"
     
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
-        for i, data in enumerate(train_loader): # Data is a tuple ([B, C, H, W], [B])
+        for i, data in enumerate(train_loader):
             img, label = data
             img = img.to(device)
             label = label.to(device)
@@ -65,17 +66,24 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             accuracy = 100 * correct / total
             print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Accuracy: {accuracy}%")
             wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss, "accuracy": accuracy})
-            # Check for improvement
+            
+            # Early Stopping
             if avg_val_loss < best_loss - min_delta:
+                print(f"Epoch {epoch + 1}: Validation loss improved from {best_loss:.4f} to {avg_val_loss:.4f}. Saving model.")
                 best_loss = avg_val_loss
                 patience_counter = 0
+                torch.save(model.state_dict(), best_model_path)  # Save the best model
             else:
                 patience_counter += 1
+                print(f"Epoch {epoch + 1}: Validation loss did not improve. Patience counter: {patience_counter}/{patience}")
                 if patience_counter >= patience:
                     print(f"Early stopping at epoch {epoch + 1}")
                     break
-
+    
+    # Load the best model before returning
+    model.load_state_dict(torch.load(best_model_path))
     print(f"Best validation loss: {best_loss}")
+
 
 if __name__ == "__main__":
     # Initialize wandb
@@ -85,7 +93,7 @@ if __name__ == "__main__":
     # Set hyperparameters
     wandb.config = {
         "learning_rate": 0.001,
-        "epochs": 20,
+        "epochs": 40,
         "batch_size": 256,
         "optimizer" : "adam",
         "k_folds": 5
@@ -136,6 +144,7 @@ if __name__ == "__main__":
         train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=wandb.config["epochs"])
         
         # Save the model for each fold
+        model.load_state_dict(torch.load(f"best_model_fold{fold}.pth"))
         torch.save(model.state_dict(), f"HelicobacterClassifier_fold{fold}.pth")
         wandb.save(f"HelicobacterClassifier_fold{fold}.pth")
     
