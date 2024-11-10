@@ -170,3 +170,4 @@ config.yml
 *.out
 wandb/
 *temp/
+Classfication/models/HelicobacterClassifier_final.pth
