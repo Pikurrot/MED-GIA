@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 import wandb
+import yaml
+import os
 # from Autoencoder import Autoencoder
 from Autoencoder_big import ImprovedAutoencoder
-from utils import HelicoDatasetAnomalyDetection
+from utils import HelicoDatasetAnomalyDetection, get_negative_patient_ids
 from torch.utils.data import DataLoader
 
 def train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=10):
@@ -53,7 +55,10 @@ if __name__ == "__main__":
 	print("batch_size: ", wandb.config["batch_size"])
 	print("learning_rate: ", wandb.config["learning_rate"])
 	# Load the dataset
-	dataset = HelicoDatasetAnomalyDetection()
+	dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+	csv_file_path = os.path.join(dataset_path, "PatientDiagnosis.csv")
+	patient_ids = get_negative_patient_ids(csv_file_path)
+	dataset = HelicoDatasetAnomalyDetection(patient_ids_to_include=patient_ids)
 	dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 	# Initialize the model
 	# model = Autoencoder()
