@@ -141,7 +141,7 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["learning_rate"])
         
         # Train the model
-        train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=wandb.config["epochs"])
+        train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=wandb.config["epochs"],fold=fold)
         
         # Save the model for each fold
         model.load_state_dict(torch.load(f"best_model_fold{fold}.pth"))
