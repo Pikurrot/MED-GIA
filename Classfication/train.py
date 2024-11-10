@@ -80,9 +80,10 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
                     print(f"Early stopping at epoch {epoch + 1}")
                     break
     
-    # Load the best model before returning
-    model.load_state_dict(torch.load(best_model_path))
-    print(f"Best validation loss: {best_loss}")
+    if val_loader is not None:
+        torch.save(model.state_dict(), best_model_path)
+        model.load_state_dict(torch.load(best_model_path))
+        print(f"Best validation loss: {best_loss}")
 
 
 if __name__ == "__main__":
@@ -149,12 +150,27 @@ if __name__ == "__main__":
         wandb.save(f"HelicobacterClassifier_fold{fold}.pth")
     
     # Final training on the entire training dataset
+    # Set hyperparameters
+    wandb.config = {
+        "learning_rate": 0.001,
+        "epochs": 14,
+        "batch_size": 256,
+        "optimizer" : "adam",
+        "k_folds": 5
+    }
+
+    
+    print("num_epochs: ", wandb.config["epochs"])
+    print("batch_size: ", wandb.config["batch_size"])
+    print("learning_rate: ", wandb.config["learning_rate"])
+    print("k_folds: ", wandb.config["k_folds"])
+    
     final_train_loader = DataLoader(train_dataset, batch_size=wandb.config["batch_size"], shuffle=True)
     final_model = HelicobacterClassifier().to(device)
     final_loss_function = nn.CrossEntropyLoss()
     final_optimizer = torch.optim.Adam(final_model.parameters(), lr=wandb.config["learning_rate"])
     
-    train(final_model, final_loss_function, final_optimizer, final_train_loader, None, device, num_epochs=wandb.config["epochs"])
+    train(final_model, final_loss_function, final_optimizer, final_train_loader, None, device, num_epochs=wandb.config["epochs"], fold=None)
     
     # Save the final model
     torch.save(final_model.state_dict(), "HelicobacterClassifier_final.pth")
