@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import yaml
 from torchvision import transforms
+from typing import List, Optional, Tuple
 
 default_path = "/fhome/vlia/HelicoDataSet"
 config_path = "config.yml"
@@ -68,8 +69,15 @@ def transform_image(image: Image, size: tuple) -> Image:
 	])
 	return transformations(image)
 
+def get_negative_patient_ids(csv_file_path: str) -> List[str]:
+    data = pd.read_csv(csv_file_path)
+    negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
+    patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+    return patient_ids
+
+
 class HelicoDatasetAnomalyDetection(Dataset):
-	def __init__(self, patient_id: bool=False) -> None:
+	def __init__(self, patient_id: bool=False, patient_ids_to_include: Optional[List[str]] = None) -> None:
 		super().__init__()
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
@@ -87,58 +95,57 @@ class HelicoDatasetAnomalyDetection(Dataset):
 		self.patient_id = patient_id
 
 		# Find all the negative diagnosis directories
-		paths_negatives = self.get_negative_diagnosis_directories(self.csv_file_path)
+		paths_negatives, patients_ids = self.get_negative_diagnosis_directories(self.csv_file_path)
+
+		# Filter by patient_ids_to_include if provided
 		paths = [os.path.join(self.cropped_path, filename) for filename in listdir(self.cropped_path)]
-		actual_paths = []
-		patients_ids = []
-		for path_negative in paths_negatives:
-			for path in paths:
-				if path_negative == path[:-2]:
-					actual_paths.append(path)
-					if patient_id:
-						patients_ids.append(os.path.basename(path)[:-2])
-					break
+		if patient_ids_to_include is not None:
+			filtered_paths_negatives = []
+			filtered_patients_ids = []
+			for path_negative, pid in zip(paths_negatives, patients_ids):
+				if pid in patient_ids_to_include:
+					for path in paths:
+						if path_negative == path[:-2]:
+							filtered_paths_negatives.append(path)
+							filtered_patients_ids.append(os.path.basename(path)[:-2])
+							break
+			paths_negatives = filtered_paths_negatives
+			patients_ids = filtered_patients_ids
 
 		# Retrieve all the patches from the directories
 		self.paths_patches = []
 		self.patient_ids_patches = []
-		for i, directory in enumerate(actual_paths):
+		for i, directory in enumerate(paths_negatives):
 			patches_names = listdir(directory, extension=".png")
 			patches_paths = [os.path.join(directory, patches_name) for patches_name in patches_names]
 			self.paths_patches.extend(patches_paths)
 			self.patient_ids_patches.extend([patients_ids[i]] * len(patches_paths))
 
-	def get_negative_diagnosis_directories(self, csv_path: str) -> list:
-		"""
-		Given a CSV file path, returns a list of directories for the NEGATIVE Diagnosis.
-		Each directory follows the format "/fhome/vlia/helicoDataSet/CrossValidation/Cropped/patientCODI",
-		where "patientCODI" is based on the CODI column in the CSV.
-
-		:param csv_path: Path to the CSV file
-		:return: List of directory paths as strings
-		"""
+	def get_negative_diagnosis_directories(self, csv_path: str) -> Tuple[List[str], List[str]]:
 		data = pd.read_csv(csv_path)
 
 		# Filter rows where the DENSITAT is "NEGATIVA"
 		negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
 
-		# Create directory paths based on the CODI values
+		# Create directory paths and patient IDs based on the CODI values
 		directories = [
-			os.path.join(self.cropped_path, codi)
+			os.path.join(self.cropped_path, str(codi))
 			for codi in negative_diagnosis["CODI"]
 		]
+		patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
 
-		return directories
+		return directories, patient_ids
 
 	def __getitem__(self, index) -> Any:
 		image = transform_image(Image.open(self.paths_patches[index]).convert("RGB"), (256, 256))
 		if self.patient_id:
-			return image, self.patient_ids_patches[index] # (image, patient_id)
+			return image, self.patient_ids_patches[index]  # (image, patient_id)
 		else:
-			return image # (image,)
+			return image  # (image,)
 
 	def __len__(self) -> int:
 		return len(self.paths_patches)
+
 
 
 class HelicoDatasetClassification(Dataset):
