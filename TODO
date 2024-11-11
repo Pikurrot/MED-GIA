@@ -1,14 +1,9 @@
 Anomaly Detection
 [x] Remove alpha channel
 [x] Do normalization in preprocessing
-[] Implement threshold for patient diagnosis (ROC curve)
+[x] Implement threshold for patient diagnosis (ROC curve)
 [x] Make model bigger (+layers, +neurons)
-[] Do grid search to find best parameters
-
-
-Questions:
-- is resnet finetunning a good approach?
-- how to do ROC curve with threshold once we have the red fractions
-- when do we use HoldOut dataset
-- Use MSE or another? (Structural Similarity Loss (SSIM))
-- Makes sense using a VAE?
+[] Do grid search using CV to find best parameters in AE (lr, weight decay, dropout)
+[] Do train/test split for patch clas threshold (find tresh with train, evaluate on test)
+[] Do train/test split for patient diag threshold (find tresh with Cropped, evaluate on Holdout)
+[] Try alternative approach: train AE, remove decoder and train classifier with input the bottleneck (or train all together?)
