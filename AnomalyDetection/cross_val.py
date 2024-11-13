@@ -52,8 +52,14 @@ def k_fold_cross_validation(k=5, num_epochs=10):
 		test_patient_ids = [patient_ids[i] for i in test_index]
 
 		# Create datasets for this fold
-		train_dataset = HelicoDatasetAnomalyDetection(patient_id=False, patient_ids_to_include=train_patient_ids)
-		test_dataset = HelicoDatasetAnomalyDetection(patient_id=False, patient_ids_to_include=test_patient_ids)
+		train_dataset = HelicoDatasetAnomalyDetection(
+			patient_ids_to_include=train_patient_ids,
+			train_ratio=1.0
+		)
+		test_dataset = HelicoDatasetAnomalyDetection(
+			patient_ids_to_include=test_patient_ids,
+			train_ratio=1.0
+		)
 
 		# Create DataLoaders
 		train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)

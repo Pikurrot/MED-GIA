@@ -56,9 +56,7 @@ if __name__ == "__main__":
 	print("learning_rate: ", wandb.config["learning_rate"])
 	# Load the dataset
 	dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
-	csv_file_path = os.path.join(dataset_path, "PatientDiagnosis.csv")
-	patient_ids = get_negative_patient_ids(csv_file_path)
-	dataset = HelicoDatasetAnomalyDetection(patient_ids_to_include=patient_ids)
+	dataset = HelicoDatasetAnomalyDetection()
 	dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 	# Initialize the model
 	# model = Autoencoder()
