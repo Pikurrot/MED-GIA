@@ -32,7 +32,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
         model.train()
         total_loss = 0
         for i, data in enumerate(train_loader):
-            img, label = data
+            img, label,_ = data
             img = img.to(device)
             label = label.to(device)
             optimizer.zero_grad()
@@ -53,7 +53,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             total = 0
             with torch.no_grad():
                 for i, data in enumerate(val_loader):
-                    img, label = data
+                    img, label,_ = data
                     img = img.to(device)
                     label = label.to(device)
                     output = model(img)
