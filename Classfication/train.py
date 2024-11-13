@@ -120,9 +120,10 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     stratified_kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
-    train_labels = [label for _, label in train_dataset]
+    train_labels = [label for _, label, _ in train_dataset]
+    train_patient_ids = [patient_id for _, _, patient_id in train_dataset]
     
-    for fold, (train_idx, val_idx) in enumerate(stratified_kfold.split(train_dataset, train_labels)):
+    for fold, (train_idx, val_idx) in enumerate(stratified_kfold.split(train_dataset, train_patient_ids)):
         print(f"FOLD {fold}")
         print("Train label distribution:", Counter([train_labels[i] for i in train_idx]))
         print("Validation label distribution:", Counter([train_labels[i] for i in val_idx]))
@@ -148,30 +149,3 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(f"best_model_fold{fold}.pth"))
         torch.save(model.state_dict(), f"HelicobacterClassifier_fold{fold}.pth")
         wandb.save(f"HelicobacterClassifier_fold{fold}.pth")
-    
-    # Final training on the entire training dataset
-    # Set hyperparameters
-    wandb.config = {
-        "learning_rate": 0.001,
-        "epochs": 14,
-        "batch_size": 256,
-        "optimizer" : "adam",
-        "k_folds": 5
-    }
-
-    
-    print("num_epochs: ", wandb.config["epochs"])
-    print("batch_size: ", wandb.config["batch_size"])
-    print("learning_rate: ", wandb.config["learning_rate"])
-    print("k_folds: ", wandb.config["k_folds"])
-    
-    final_train_loader = DataLoader(train_dataset, batch_size=wandb.config["batch_size"], shuffle=True)
-    final_model = HelicobacterClassifier().to(device)
-    final_loss_function = nn.CrossEntropyLoss()
-    final_optimizer = torch.optim.Adam(final_model.parameters(), lr=wandb.config["learning_rate"])
-    
-    train(final_model, final_loss_function, final_optimizer, final_train_loader, None, device, num_epochs=wandb.config["epochs"], fold=None)
-    
-    # Save the final model
-    torch.save(final_model.state_dict(), "HelicobacterClassifier_final.pth")
-    wandb.save("HelicobacterClassifier_final.pth")
