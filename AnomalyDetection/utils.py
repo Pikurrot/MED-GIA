@@ -4,8 +4,9 @@ from PIL import Image
 import os
 import pandas as pd
 import yaml
+import numpy as np
 from torchvision import transforms
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Literal
 
 default_path = "/fhome/vlia/HelicoDataSet"
 config_path = "config.yml"
@@ -70,14 +71,36 @@ def transform_image(image: Image, size: tuple) -> Image:
 	return transformations(image)
 
 def get_negative_patient_ids(csv_file_path: str) -> List[str]:
+	# Gets all the patient IDs with a negative diagnosis
+	data = pd.read_csv(csv_file_path)
+	negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
+	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+	return patient_ids
+
+def get_classification_patient_ids(excel_file_path: str) -> List[str]:
+	# Gets all the patient IDs from the excel file
+	data = pd.read_excel(excel_file_path)
+	patient_ids = data["Pat_ID"].astype(str).tolist()
+	unique_patient_ids = sorted(list(set(patient_ids)))
+	return unique_patient_ids
+
+def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
+	# Gets all the patient IDs except with diagnosis BAIXA
     data = pd.read_csv(csv_file_path)
-    negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
+    negative_diagnosis = data[data["DENSITAT"] != "BAIXA"]
     patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
     return patient_ids
 
 
 class HelicoDatasetAnomalyDetection(Dataset):
-	def __init__(self, patient_id: bool=False, patient_ids_to_include: Optional[List[str]] = None) -> None:
+	def __init__(
+			self,
+			patient_id: bool=False,
+			split: Literal["train", "val"]="train",
+			train_ratio: float=0.8,
+			random_seed: int=42,
+			patient_ids_to_include: Optional[List[str]]=None
+	):
 		super().__init__()
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
@@ -96,6 +119,17 @@ class HelicoDatasetAnomalyDetection(Dataset):
 
 		# Find all the negative diagnosis directories
 		paths_negatives, patients_ids = self.get_negative_diagnosis_directories(self.csv_file_path)
+
+		# Split the data into train and test sets
+		if patient_ids_to_include is None:
+			patient_ids_to_include = get_negative_patient_ids(self.csv_file_path)
+		train_size = int(len(patient_ids_to_include) * train_ratio)
+		train_indices = np.random.RandomState(random_seed).choice(len(patient_ids_to_include), train_size, replace=False)
+		test_indices = np.array([i for i in range(len(patient_ids_to_include)) if i not in train_indices])
+		if split == "train":
+			patient_ids_to_include = [patient_ids_to_include[i] for i in train_indices]
+		else:
+			patient_ids_to_include = [patient_ids_to_include[i] for i in test_indices]
 
 		# Filter by patient_ids_to_include if provided
 		paths = [os.path.join(self.cropped_path, filename) for filename in listdir(self.cropped_path)]
@@ -149,7 +183,14 @@ class HelicoDatasetAnomalyDetection(Dataset):
 
 
 class HelicoDatasetClassification(Dataset):
-	def __init__(self, patient_id: bool=False) -> None:
+	def __init__(
+			self,
+			patient_id: bool=False,
+			split: Literal["train", "val"]="train",
+			train_ratio: float=0.8,
+			random_seed: int=42,
+			patient_ids_to_include: Optional[List[str]]=None
+	):
 		super().__init__()
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
@@ -166,14 +207,21 @@ class HelicoDatasetClassification(Dataset):
 		self.excel_file_path = os.path.join(self.dataset_path, "HP_WSI-CoordAnnotatedPatches.xlsx")
 		self.patient_id = patient_id
 
-		self.paths_labels = self.get_paths_and_labels(self.annotated_path, self.excel_file_path)
+		if patient_ids_to_include is None:
+			patient_ids_to_include = get_classification_patient_ids(self.excel_file_path)
+		self.paths_labels = self.get_paths_and_labels(
+			self.annotated_path, self.excel_file_path,
+			split, train_ratio, random_seed, patient_ids_to_include
+		)
 	
-	def get_paths_and_labels(self, annotated_path: str, excel_path: str) -> tuple:
+	def get_paths_and_labels(self, annotated_path: str, excel_path: str, *args) -> tuple:
 		"""
 		Given the annotated path and an Excel file path with columns "Path_ID", "Window_ID", and "Presence" (which ranges -1, 0, 1),
 		returns a list of tuples (path, label). The label is 0 if the presence is -1, and 1 if the presence is 1.
 		Samples with "Presence" 0 are ignored.
 		"""
+		split, train_ratio, random_seed, patient_ids_to_include = args
+
 		# Load the Excel file
 		data = pd.read_excel(excel_path)
 
@@ -187,23 +235,42 @@ class HelicoDatasetClassification(Dataset):
 		]
 		paths = [os.path.join(annotated_path, filename) for filename in listdir(annotated_path)]
 		actual_paths = []
+		patient_ids = []
 		for path_label_tup in paths_labels:
 			path_label = os.path.dirname(path_label_tup[0])
 			for path in paths:
-				if path_label == path[:-2]:
+				patient_id = os.path.basename(path)[:-2]
+				if path_label == path[:-2] and patient_id in patient_ids_to_include:
 					basename = os.path.splitext(os.path.basename(path_label_tup[0]))[0].zfill(5)
 					listed_basenames = listdir(path)
 					actual_basenames = [listed_basename for listed_basename in listed_basenames if listed_basename.startswith(basename)]
 					label_append = path_label_tup[1]
 					for actual_basename in actual_basenames:
 						path_append = os.path.join(path, actual_basename)
-						if self.patient_id:
-							actual_paths.append((path_append, label_append, os.path.basename(path)[:-2]))
-						else:
-							actual_paths.append((path_append, label_append))
+						actual_paths.append((path_append, label_append, patient_id))
+						patient_ids.append(patient_id)
 					break
 
-		return actual_paths
+		# Split the data into train and test sets
+		unique_patient_ids = sorted(list(set(patient_ids)))
+		train_size = int(len(unique_patient_ids) * train_ratio)
+		train_indices = np.random.RandomState(random_seed).choice(len(unique_patient_ids), train_size, replace=False)
+		test_indices = np.array([i for i in range(len(unique_patient_ids)) if i not in train_indices])
+		if split == "train":
+			unique_patient_ids = [unique_patient_ids[i] for i in train_indices]
+		else:
+			unique_patient_ids = [unique_patient_ids[i] for i in test_indices]
+		
+		# Filter by unique_patient_ids
+		filtered_paths_labels = []
+		for path_label in actual_paths:
+			if path_label[2] in unique_patient_ids:
+				if self.patient_id:
+					filtered_paths_labels.append(path_label)
+				else:
+					filtered_paths_labels.append(path_label[:2])
+
+		return filtered_paths_labels
 		
 	def __getitem__(self, index) -> Any:
 		if self.patient_id:
@@ -218,7 +285,13 @@ class HelicoDatasetClassification(Dataset):
 
 
 class HelicoDatasetPatientDiagnosis(Dataset):
-	def __init__(self) -> None:
+	def __init__(
+			self,
+			split: Literal["train", "val", "test"]="train",
+			train_ratio: float=0.8, # only for train-val, test is always the whole Holdout
+			random_seed: int=42,
+			patient_ids_to_include: Optional[List[str]]=None
+	):
 		# Initialize paths
 		path_error = ensure_dataset_path_yaml()
 		if path_error == 1:
@@ -231,7 +304,13 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 		
 		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
 		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
+		self.cropped_path = os.path.join(self.dataset_path, "CrossValidation", "Cropped")
 		self.holdout_path = os.path.join(self.dataset_path, "HoldOut")
+		if split == "test":
+			data_path = self.holdout_path
+			train_ratio = 0
+		else:
+			data_path = self.cropped_path
 
 		# Load the CSV file
 		csv = pd.read_csv(self.csv_file_path)
@@ -242,20 +321,31 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 		patients_diagnosis = patients_diagnosis[patients_diagnosis != "BAIXA"]
 		# patient_diagnosis to 0 or 1
 		patients_diagnosis = [0 if diagnosis == "NEGATIVA" else 1 for diagnosis in patients_diagnosis]
+		# Build a mapping from patient_id to diagnosis
+		patient_id_to_diagnosis = dict(zip(patients_ids, patients_diagnosis))
+
+		if patient_ids_to_include is None:
+			patient_ids_to_include = patients_ids.tolist()
+
+		# Split into train and test sets
+		train_size = int(len(patient_ids_to_include) * train_ratio)
+		train_indices = np.random.RandomState(random_seed).choice(len(patient_ids_to_include), train_size, replace=False)
+		test_indices = np.array([i for i in range(len(patient_ids_to_include)) if i not in train_indices])
+		if split == "train":
+			patient_ids_to_include = [patient_ids_to_include[i] for i in train_indices]
+		else:
+			patient_ids_to_include = [patient_ids_to_include[i] for i in test_indices]
 
 		# Initialize empty lists to store valid patient data
 		valid_patient_ids = []
 		valid_patient_diagnosis = []
 		patient_paths = []
 
-		# Build a mapping from patient_id to diagnosis
-		patient_id_to_diagnosis = dict(zip(patients_ids, patients_diagnosis))
-
 		# Fetch all the patient directories and ensure alignment
-		for patient_directory in listdir(self.holdout_path):
-			for patient_id in patients_ids:
+		for patient_directory in listdir(data_path):
+			for patient_id in patient_ids_to_include:
 				if patient_directory.startswith(patient_id):
-					patient_paths.append(os.path.join(self.holdout_path, patient_directory))
+					patient_paths.append(os.path.join(data_path, patient_directory))
 					valid_patient_ids.append(patient_id)
 					valid_patient_diagnosis.append(patient_id_to_diagnosis[patient_id])
 					break
@@ -266,22 +356,6 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 			patches = listdir(patient_path, extension=".png")
 			for patch in patches:
 				self.triplets.append((os.path.join(patient_path, patch), valid_patient_ids[i], valid_patient_diagnosis[i]))
-
-		# # fetch all the patient directories
-		# patient_directories = []
-		# for patient_id in patients_ids:
-		# 	for patient_directory in listdir(self.holdout_path):
-		# 		if patient_directory.startswith(patient_id):
-		# 			patient_directories.append(patient_directory)
-		# 			break
-		# patient_paths = [os.path.join(self.holdout_path, patient_directory) for patient_directory in patient_directories]
-		
-		# # fetch all the patches from the patient directories
-		# self.triplets = [] # (patch_path, patient_id, patient_diagnosis)
-		# for i, patient_path in enumerate(patient_paths):
-		# 	patches = listdir(patient_path, extension=".png")
-		# 	for patch in patches:
-		# 		self.triplets.append((os.path.join(patient_path, patch), patients_ids[i], patients_diagnosis[i]))
 
 	def __getitem__(self, index) -> Any:
 		path, patient_id, patient_diagnosis = self.triplets[index]
@@ -294,9 +368,10 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 
 if __name__ == "__main__":
 	# dataset = HelicoDatasetAnomalyDetection()
-	dataset = HelicoDatasetPatientDiagnosis()
+	dataset = HelicoDatasetPatientDiagnosis(split="test", train_ratio=0.8, random_seed=42)
 	print(len(dataset))
-	print(dataset[0][0].shape, dataset[0][1], dataset[0][2])
+	print(dataset[0])
+	# print(dataset[0][0].shape, dataset[0][1], dataset[0][2])
 	# ensure all iterations work
-	for i in range(len(dataset)):
-		dataset[i]
+	# for i in range(len(dataset)):
+	# 	dataset[i]
