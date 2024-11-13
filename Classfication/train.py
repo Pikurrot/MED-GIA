@@ -106,7 +106,7 @@ if __name__ == "__main__":
     print("k_folds: ", wandb.config["k_folds"])
     
     # Load the dataset
-    dataset = HelicoDatasetClassification()
+    dataset = HelicoDatasetClassification(patient_id=True)
     
     k_folds = wandb.config["k_folds"]
      
