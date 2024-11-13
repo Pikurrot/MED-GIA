@@ -4,7 +4,9 @@ from PIL import Image
 import os
 import pandas as pd
 import yaml
+import numpy as np
 from torchvision import transforms
+from typing import List, Optional, Tuple, Literal
 
 default_path = "/fhome/vlia/HelicoDataSet"
 config_path = "config.yml"
@@ -64,9 +66,30 @@ def transform_image(image: Image, size: tuple) -> Image:
 	transformations = transforms.Compose([
 		transforms.Resize(size),
 		transforms.ToTensor(),
-		transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+		transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	])
 	return transformations(image)
+
+def get_negative_patient_ids(csv_file_path: str) -> List[str]:
+	# Gets all the patient IDs with a negative diagnosis
+	data = pd.read_csv(csv_file_path)
+	negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
+	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+	return patient_ids
+
+def get_classification_patient_ids(excel_file_path: str) -> List[str]:
+	# Gets all the patient IDs from the excel file
+	data = pd.read_excel(excel_file_path)
+	patient_ids = data["Pat_ID"].astype(str).tolist()
+	unique_patient_ids = sorted(list(set(patient_ids)))
+	return unique_patient_ids
+
+def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
+	# Gets all the patient IDs except with diagnosis BAIXA
+    data = pd.read_csv(csv_file_path)
+    negative_diagnosis = data[data["DENSITAT"] != "BAIXA"]
+    patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+    return patient_ids
 
 class HelicoDatasetAnomalyDetection(Dataset):
 	def __init__(self) -> None:

@@ -108,22 +108,17 @@ if __name__ == "__main__":
     # Load the dataset
     dataset = HelicoDatasetClassification()
     
-    # Split the dataset into training and testing sets
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    torch.manual_seed(42)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
-
     k_folds = wandb.config["k_folds"]
      
     # Initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     stratified_kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
-    train_labels = [label for _, label, _ in train_dataset]
-    train_patient_ids = [patient_id for _, _, patient_id in train_dataset]
+    train_labels = [label for _, label, _ in dataset]
+    train_patient_ids = [patient_id for _, _, patient_id in dataset]
+    torch.manual_seed(42)
     
-    for fold, (train_idx, val_idx) in enumerate(stratified_kfold.split(train_dataset, train_patient_ids)):
+    for fold, (train_idx, val_idx) in enumerate(stratified_kfold.split(dataset, train_labels, groups=train_patient_ids)):
         print(f"FOLD {fold}")
         print("Train label distribution:", Counter([train_labels[i] for i in train_idx]))
         print("Validation label distribution:", Counter([train_labels[i] for i in val_idx]))
@@ -134,8 +129,8 @@ if __name__ == "__main__":
         val_subsampler = torch.utils.data.SubsetRandomSampler(val_idx)
         
         # Define data loaders for training and validation
-        train_loader = DataLoader(train_dataset, batch_size=wandb.config["batch_size"], sampler=train_subsampler)
-        val_loader = DataLoader(train_dataset, batch_size=wandb.config["batch_size"], sampler=val_subsampler)
+        train_loader = DataLoader(dataset, batch_size=wandb.config["batch_size"], sampler=train_subsampler)
+        val_loader = DataLoader(dataset, batch_size=wandb.config["batch_size"], sampler=val_subsampler)
         
         # Initialize the model
         model = HelicobacterClassifier()
