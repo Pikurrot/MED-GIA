@@ -72,10 +72,10 @@ def transform_image(image: Image, size: tuple) -> Image:
 
 def get_negative_patient_ids(csv_file_path: str) -> List[str]:
 	# Gets all the patient IDs with a negative diagnosis
-    data = pd.read_csv(csv_file_path)
-    negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
-    patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
-    return patient_ids
+	data = pd.read_csv(csv_file_path)
+	negative_diagnosis = data[data["DENSITAT"] == "NEGATIVA"]
+	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+	return patient_ids
 
 def get_classification_patient_ids(excel_file_path: str) -> List[str]:
 	# Gets all the patient IDs from the excel file
@@ -83,6 +83,13 @@ def get_classification_patient_ids(excel_file_path: str) -> List[str]:
 	patient_ids = data["Pat_ID"].astype(str).tolist()
 	unique_patient_ids = sorted(list(set(patient_ids)))
 	return unique_patient_ids
+
+def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
+	# Gets all the patient IDs except with diagnosis BAIXA
+    data = pd.read_csv(csv_file_path)
+    negative_diagnosis = data[data["DENSITAT"] != "BAIXA"]
+    patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+    return patient_ids
 
 
 class HelicoDatasetAnomalyDetection(Dataset):
