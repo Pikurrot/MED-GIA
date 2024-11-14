@@ -276,7 +276,7 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 			pred_diagnosis = (pred_pp_val > optimal_threshold_pp).astype(int)
 
 			# Evaluate patient diagnosis
-			_, _, _, _, conf_matrix_diag = evaluate_classification(pred_diagnosis, gt_pp_train)
+			_, _, _, _, conf_matrix_diag = evaluate_classification(pred_diagnosis, gt_pp_val)
 
 			# Aggregate results and log to WandB if last fold
 			if model_name == "Autoencoder":
