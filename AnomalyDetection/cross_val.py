@@ -249,18 +249,23 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 			print(f"ROC AUC: {roc_auc_rf}")
 
 			# Classify patches using the optimal threshold
+			print("Classifying patches using the optimal threshold")
 			pred_patch_class, gt_patch_class, _ = classify_patches(model, val_loader_clas, device, optimal_threshold_rf)
 
 			# Evaluate patch classification
+			print("Evaluating patch classification")
 			_, _, _, _, conf_matrix_class = evaluate_classification(pred_patch_class, gt_patch_class)
 
 			# Classify patches again for diagnosis
+			print("Classifying patches for patient diagnosis")
 			pred_diag_train, patient_ids_diag_train, gt_patient_diagnosis_train = classify_patches_diag(model, train_loader_diag, device, optimal_threshold_rf)
 
 			# Get percentage of positive patches per patient
+			print("Getting percentage of positive patches per patient")
 			gt_pp_train, pred_pp_train = get_percentage_positive_patches(patient_ids_diag_train, pred_diag_train, gt_patient_diagnosis_train)
 
 			# Find optimal threshold on percentage of positive patches
+			print("Finding optimal threshold on percentage of positive patches")
 			optimal_threshold_pp, roc_auc_pp = find_optimal_threshold(pred_pp_train, gt_pp_train)
 			print(f"Optimal threshold on percentage of positive patches: {optimal_threshold_pp}")
 			print(f"ROC AUC: {roc_auc_pp}")
