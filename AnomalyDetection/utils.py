@@ -5,6 +5,8 @@ import os
 import pandas as pd
 import yaml
 import numpy as np
+import torch
+import cv2
 from torchvision import transforms
 from typing import List, Optional, Tuple, Literal
 
@@ -70,6 +72,12 @@ def transform_image(image: Image, size: tuple) -> Image:
 	])
 	return transformations(image)
 
+def get_cropped_patient_ids(cropped_path: str) -> List[str]:
+	# Get all the patient IDs from the cropped path
+	patient_ids = listdir(cropped_path)
+	patient_ids = [patient_id[:-2] for patient_id in patient_ids]
+	return patient_ids
+
 def get_negative_patient_ids(csv_file_path: str) -> List[str]:
 	# Gets all the patient IDs with a negative diagnosis
 	data = pd.read_csv(csv_file_path)
@@ -86,10 +94,57 @@ def get_classification_patient_ids(excel_file_path: str) -> List[str]:
 
 def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
 	# Gets all the patient IDs except with diagnosis BAIXA
-    data = pd.read_csv(csv_file_path)
-    negative_diagnosis = data[data["DENSITAT"] != "BAIXA"]
-    patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
-    return patient_ids
+	data = pd.read_csv(csv_file_path)
+	negative_diagnosis = data[data["DENSITAT"] != "BAIXA"]
+	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
+	return patient_ids
+
+def postprocess(tensor, p=0):
+	if tensor.dim() == 4:
+		tensor = tensor.squeeze(0)
+	tensor = tensor.cpu()
+	tensor = tensor * 0.5 + 0.5
+	tensor = tensor * 255
+	tensor = tensor.clamp(0, 255)
+	tensor = tensor.type(torch.uint8)
+	tensor = tensor.permute(1, 2, 0).numpy()
+	if p > 0:
+		# center crop
+		tensor = tensor[p:256-p, p:256-p, :]
+		# padd again with blue color
+		tensor = cv2.copyMakeBorder(tensor, p, p, p, p, cv2.BORDER_CONSTANT, value=[228, 232, 248])
+	return tensor
+
+def check_red_fraction(orig, reco):
+	# Convert the images from RGB to HSV
+	input_image_hsv = cv2.cvtColor(orig, cv2.COLOR_RGB2HSV)
+	reconstructed_image_hsv = cv2.cvtColor(reco, cv2.COLOR_RGB2HSV)
+
+	# Define the hue range for red pixels as suggested
+	# For -20 to 0 in HSV, which corresponds to hues 160-180 in OpenCV's scale
+	input_lower_hsv1 = np.array([340, 0, 0])
+	input_upper_hsv1 = np.array([360, 255, 255])
+
+	# For 0 to 20 in HSV
+	input_lower_hsv2 = np.array([0, 0, 0])
+	input_upper_hsv2 = np.array([20, 255, 255])
+
+	# Apply masks to the original image
+	mask_ori1 = cv2.inRange(input_image_hsv, input_lower_hsv1, input_upper_hsv1)
+	mask_ori2 = cv2.inRange(input_image_hsv, input_lower_hsv2, input_upper_hsv2)
+	mask_ori = cv2.bitwise_or(mask_ori1, mask_ori2)
+	count_red_ori = np.count_nonzero(mask_ori)
+
+	# Apply masks to the reconstructed image
+	mask_rec1 = cv2.inRange(reconstructed_image_hsv, input_lower_hsv1, input_upper_hsv1)
+	mask_rec2 = cv2.inRange(reconstructed_image_hsv, input_lower_hsv2, input_upper_hsv2)
+	mask_rec = cv2.bitwise_or(mask_rec1, mask_rec2)
+	count_red_rec = np.count_nonzero(mask_rec)
+
+	# Calculate the fraction of red pixels
+	F_red = count_red_ori / (count_red_rec+1)
+
+	return F_red
 
 
 class HelicoDatasetAnomalyDetection(Dataset):
@@ -133,18 +188,17 @@ class HelicoDatasetAnomalyDetection(Dataset):
 
 		# Filter by patient_ids_to_include if provided
 		paths = [os.path.join(self.cropped_path, filename) for filename in listdir(self.cropped_path)]
-		if patient_ids_to_include is not None:
-			filtered_paths_negatives = []
-			filtered_patients_ids = []
-			for path_negative, pid in zip(paths_negatives, patients_ids):
-				if pid in patient_ids_to_include:
-					for path in paths:
-						if path_negative == path[:-2]:
-							filtered_paths_negatives.append(path)
-							filtered_patients_ids.append(os.path.basename(path)[:-2])
-							break
-			paths_negatives = filtered_paths_negatives
-			patients_ids = filtered_patients_ids
+		filtered_paths_negatives = []
+		filtered_patients_ids = []
+		for path_negative, pid in zip(paths_negatives, patients_ids):
+			if pid in patient_ids_to_include:
+				for path in paths:
+					if path_negative == path[:-2]:
+						filtered_paths_negatives.append(path)
+						filtered_patients_ids.append(os.path.basename(path)[:-2])
+						break
+		paths_negatives = filtered_paths_negatives
+		self.patients_ids = filtered_patients_ids
 
 		# Retrieve all the patches from the directories
 		self.paths_patches = []
@@ -153,7 +207,7 @@ class HelicoDatasetAnomalyDetection(Dataset):
 			patches_names = listdir(directory, extension=".png")
 			patches_paths = [os.path.join(directory, patches_name) for patches_name in patches_names]
 			self.paths_patches.extend(patches_paths)
-			self.patient_ids_patches.extend([patients_ids[i]] * len(patches_paths))
+			self.patient_ids_patches.extend([self.patients_ids[i]] * len(patches_paths))
 
 	def get_negative_diagnosis_directories(self, csv_path: str) -> Tuple[List[str], List[str]]:
 		data = pd.read_csv(csv_path)

@@ -8,7 +8,7 @@ from Autoencoder_big import ImprovedAutoencoder
 from utils import HelicoDatasetAnomalyDetection, get_negative_patient_ids
 from torch.utils.data import DataLoader
 
-def train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=10):
+def train_ae(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=10):
 	"""
 	Train the model on the given dataset for the specified number of epochs.
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	print(f"Using device {device}")
 	# Train the model
-	train(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=wandb.config["epochs"])
+	train_ae(model, loss_function, optimizer, scheduler, dataloader, device, num_epochs=wandb.config["epochs"])
 	# Save the model
 	model_name = "ImprovedAutoencoder.pth"
 	torch.save(model.state_dict(), model_name)
