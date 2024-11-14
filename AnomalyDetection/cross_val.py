@@ -9,8 +9,8 @@ from sklearn.model_selection import KFold
 from train import train_ae
 from Autoencoder import Autoencoder
 from Autoencoder_big import ImprovedAutoencoder
-from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, check_red_fraction,\
-	get_cropped_patient_ids, postprocess, get_classification_patient_ids, get_negative_patient_ids
+from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, HelicoDatasetPatientDiagnosis,\
+	check_red_fraction,	get_cropped_patient_ids, postprocess, get_negative_patient_ids, get_diagnosis_patient_ids
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
@@ -60,6 +60,27 @@ def classify_patches(model, dataloader, device, threshold):
 	predictions = (red_fracs > threshold).astype(int)
 	return predictions, labels, patient_ids
 
+def classify_patches_diag(model, dataloader, device, threshold):
+	red_fracs = []
+	patient_ids = []
+	gt_patient_diagnosis = []
+	for batch in dataloader:
+		b_orig_images = batch[0].to(device)
+		patient_ids.extend(batch[1])
+		gt_patient_diagnosis.extend(batch[2])
+		with torch.no_grad():
+			reco_images = model(b_orig_images)
+		for i in range(len(b_orig_images)):
+			red_fracs.append(check_red_fraction(
+				postprocess(b_orig_images[i]),
+				postprocess(reco_images[i])
+			))
+	red_fracs = np.array(red_fracs)
+	patient_ids = np.array(patient_ids)
+	gt_patient_diagnosis = np.array(gt_patient_diagnosis)
+	predictions = (red_fracs > threshold).astype(int)
+	return predictions, patient_ids, gt_patient_diagnosis
+
 def evaluate_classification(predictions, labels):
 	tn, fp, fn, tp = confusion_matrix(labels, predictions).ravel()
 	epsilon = 1e-10
@@ -95,8 +116,8 @@ def get_percentage_positive_patches(patient_ids, patch_preds, gt_patient_diagnos
 	patient_diagnosis = results.groupby("Patient ID")["GT patient diagnosis"].first().reset_index()
 	pos_patches_per_patient = pos_patches_per_patient.merge(patient_diagnosis, on="Patient ID")
 
-	gt = pos_patches_per_patient["GT patient diagnosis"]
-	pred = pos_patches_per_patient["Percentage of Positive Patches"]
+	gt = pos_patches_per_patient["GT patient diagnosis"].to_numpy(dtype=np.int32)
+	pred = pos_patches_per_patient["Percentage of Positive Patches"].to_numpy(dtype=np.float32)
 	return gt, pred
 
 
@@ -114,10 +135,8 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 	csv_file_path = os.path.join(dataset_path, "PatientDiagnosis.csv")
 	neg_patient_ids = get_negative_patient_ids(csv_file_path)
 
-	# Get all patient IDs with their diagnosis
-	# excel_file_path = os.path.join(dataset_path, "HP_WSI-CoordAnnotatedPatches.xlsx")
-	# clas_patient_ids = get_classification_patient_ids(excel_file_path)
-	# crop_clas_patient_ids = list(set(crop_patient_ids) & set(clas_patient_ids))
+	# Get all diagnosis patient IDs
+	diag_patient_ids = get_diagnosis_patient_ids(csv_file_path)
 
 	# Set up KFold cross-validator
 	kf = KFold(n_splits=k, shuffle=True, random_state=42)
@@ -128,8 +147,10 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 		'ImprovedAutoencoder': ImprovedAutoencoder
 	}
 
-	lst_conf_matrix = []
-	lst_conf_matrix_improved = []
+	lst_conf_matrix_class = []
+	lst_conf_matrix_improved_class = []
+	lst_conf_matrix_diag = []
+	lst_conf_matrix_improved_diag = []
 
 	# Loop over each fold
 	for fold, (train_index, test_index) in enumerate(kf.split(crop_patient_ids)):
@@ -164,12 +185,26 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 		)
 		print(f"Classification Train set size: {len(train_dataset_clas)}")
 		print(f"Classification Validation set size: {len(val_dataset_clas)}")
+		train_patient_ids_diag = list(set(crop_patient_ids) & set(diag_patient_ids))
+		val_patient_ids_diag = list(set(val_patient_ids) & set(diag_patient_ids))
+		train_dataset_diag = HelicoDatasetPatientDiagnosis(
+			patient_ids_to_include=train_patient_ids_diag,
+			train_ratio=1.0
+		)
+		val_dataset_diag = HelicoDatasetPatientDiagnosis(
+			patient_ids_to_include=val_patient_ids_diag,
+			train_ratio=1.0
+		)
+		print(f"Patient Diagnosis Train set size: {len(train_dataset_diag)}")
+		print(f"Patient Diagnosis Validation set size: {len(val_dataset_diag)}")
 
 		# Create DataLoaders
 		train_loader_ae = DataLoader(train_dataset_ae, batch_size=256, shuffle=True)
 		val_loader_ae = DataLoader(val_dataset_ae, batch_size=256, shuffle=False)
 		train_loader_clas = DataLoader(train_dataset_clas, batch_size=256, shuffle=True)
 		val_loader_clas = DataLoader(val_dataset_clas, batch_size=256, shuffle=False)
+		train_loader_diag = DataLoader(train_dataset_diag, batch_size=256, shuffle=True)
+		val_loader_diag = DataLoader(val_dataset_diag, batch_size=256, shuffle=False)
 
 		# Loop over each model
 		for model_name, ModelClass in models.items():
@@ -206,41 +241,79 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 			wandb.save(model_filename)
 
 			# Inference on the train patch classification set
-			train_red_fracs, train_labels, train_patient_ids = inference_ae(model, train_loader_clas, device)
+			train_red_fracs, train_labels, _ = inference_ae(model, train_loader_clas, device)
 
 			# Find optimal threshold on red fraction
-			optimal_threshold, roc_auc = find_optimal_threshold(train_red_fracs, train_labels)
-			print(f"Optimal threshold on red fraction: {optimal_threshold}")
-			print(f"ROC AUC: {roc_auc}")
+			optimal_threshold_rf, roc_auc_rf = find_optimal_threshold(train_red_fracs, train_labels)
+			print(f"Optimal threshold on red fraction: {optimal_threshold_rf}")
+			print(f"ROC AUC: {roc_auc_rf}")
 
 			# Classify patches using the optimal threshold
-			predictions, labels, patient_ids = classify_patches(model, val_loader_clas, device, optimal_threshold)
+			pred_patch_class, gt_patch_class, _ = classify_patches(model, val_loader_clas, device, optimal_threshold_rf)
 
 			# Evaluate patch classification
-			_, _, _, _, conf_matrix = evaluate_classification(predictions, labels)
-			if model_name == "Autoencoder":
-				lst_conf_matrix.append(conf_matrix)
-			else:
-				lst_conf_matrix_improved.append(conf_matrix)
+			_, _, _, _, conf_matrix_class = evaluate_classification(pred_patch_class, gt_patch_class)
+
+			# Classify patches again for diagnosis
+			pred_diag_train, patient_ids_diag_train, gt_patient_diagnosis_train = classify_patches_diag(model, train_loader_diag, device, optimal_threshold_rf)
+
+			# Get percentage of positive patches per patient
+			gt_pp_train, pred_pp_train = get_percentage_positive_patches(patient_ids_diag_train, pred_diag_train, gt_patient_diagnosis_train)
+
+			# Find optimal threshold on percentage of positive patches
+			optimal_threshold_pp, roc_auc_pp = find_optimal_threshold(pred_pp_train, gt_pp_train)
+			print(f"Optimal threshold on percentage of positive patches: {optimal_threshold_pp}")
+			print(f"ROC AUC: {roc_auc_pp}")
+
+			# Predict patient diagnosis
+			pred_pp_val, patient_ids_diag_val, gt_patient_diagnosis_val = classify_patches_diag(model, val_loader_diag, device, optimal_threshold_rf)
+			gt_pp_val, pred_pp_val = get_percentage_positive_patches(patient_ids_diag_val, pred_pp_val, gt_patient_diagnosis_val)
+			pred_diagnosis = (pred_pp_val > optimal_threshold_pp).astype(int)
+
+			# Evaluate patient diagnosis
+			_, _, _, _, conf_matrix_diag = evaluate_classification(pred_diagnosis, gt_pp_train)
 
 			# Aggregate results and log to WandB if last fold
+			if model_name == "Autoencoder":
+				lst_conf_matrix_class.append(conf_matrix_class)
+				lst_conf_matrix_diag.append(conf_matrix_diag)
+			else:
+				lst_conf_matrix_improved_class.append(conf_matrix_class)
+				lst_conf_matrix_improved_diag.append(conf_matrix_diag)
+
 			if fold == k - 1:
 				if model_name == "Autoencoder":
-					accuracy, precision, recall, f1_score, conf_matrix = aggregate_results(lst_conf_matrix)
+					accuracy, precision, recall, f1_score, conf_matrix_class = aggregate_results(lst_conf_matrix_class)
 					print("\nAggregated results for Autoencoder:")
-					print(f"- Accuracy: {accuracy}")
-					print(f"- Precision: {precision}")
-					print(f"- Recall: {recall}")
-					print(f"- F1 Score: {f1_score}")
-					print(f"- Confusion Matrix:\n{conf_matrix}")
+					print("- Patch classification:")
+					print(f"\t- Accuracy: {accuracy}")
+					print(f"\t- Precision: {precision}")
+					print(f"\t- Recall: {recall}")
+					print(f"\t- F1 Score: {f1_score}")
+					print(f"\t- Confusion Matrix:\n{conf_matrix_class}")
+					print("- Patient diagnosis:")
+					accuracy, precision, recall, f1_score, conf_matrix_diag = aggregate_results(lst_conf_matrix_diag)
+					print(f"\t- Accuracy: {accuracy}")
+					print(f"\t- Precision: {precision}")
+					print(f"\t- Recall: {recall}")
+					print(f"\t- F1 Score: {f1_score}")
+					print(f"\t- Confusion Matrix:\n{conf_matrix_diag}")
 				else:
-					accuracy_improved, precision_improved, recall_improved, f1_score_improved, conf_matrix_improved = aggregate_results(lst_conf_matrix_improved)
+					accuracy_improved, precision_improved, recall_improved, f1_score_improved, conf_matrix_improved = aggregate_results(lst_conf_matrix_improved_class)
 					print("\nAggregated results for Improved Autoencoder:")
-					print(f"- Accuracy: {accuracy_improved}")
-					print(f"- Precision: {precision_improved}")
-					print(f"- Recall: {recall_improved}")
-					print(f"- F1 Score: {f1_score_improved}")
-					print(f"- Confusion Matrix:\n{conf_matrix_improved}")
+					print("- Patch classification:")
+					print(f"\t- Accuracy: {accuracy_improved}")
+					print(f"\t- Precision: {precision_improved}")
+					print(f"\t- Recall: {recall_improved}")
+					print(f"\t- F1 Score: {f1_score_improved}")
+					print(f"\t- Confusion Matrix:\n{conf_matrix_improved}")
+					print("- Patient diagnosis:")
+					accuracy_improved, precision_improved, recall_improved, f1_score_improved, conf_matrix_improved = aggregate_results(lst_conf_matrix_improved_diag)
+					print(f"\t- Accuracy: {accuracy_improved}")
+					print(f"\t- Precision: {precision_improved}")
+					print(f"\t- Recall: {recall_improved}")
+					print(f"\t- F1 Score: {f1_score_improved}")
+					print(f"\t- Confusion Matrix:\n{conf_matrix_improved}")
 
 			# Finish WandB run
 			wandb.finish()
