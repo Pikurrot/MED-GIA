@@ -9,7 +9,6 @@ from Autoencoder import Autoencoder
 from Autoencoder_big import ImprovedAutoencoder
 from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, check_red_fraction, postprocess
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import confusion_matrix
@@ -31,7 +30,7 @@ def inference_ae(model, dataloader, device):
 	red_fracs = []
 	labels = []
 	patient_ids = []
-	for batch in tqdm(dataloader):
+	for batch in dataloader:
 		b_orig_images = batch[0].to(device)
 		b_labels = batch[1].to(device)
 		patient_ids.extend(batch[2])
