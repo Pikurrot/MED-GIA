@@ -102,7 +102,7 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 	print(f"Using device {device}")
 
 	# Get all negative patient IDs from Cropped
-	patient_ids = HelicoDatasetAnomalyDetection(train_ratio=1.0).patient_ids
+	patient_ids = HelicoDatasetAnomalyDetection(train_ratio=1.0).patients_ids
 
 	# Set up KFold cross-validator
 	kf = KFold(n_splits=k, shuffle=True, random_state=42)
