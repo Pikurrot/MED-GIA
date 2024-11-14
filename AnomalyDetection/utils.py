@@ -72,6 +72,12 @@ def transform_image(image: Image, size: tuple) -> Image:
 	])
 	return transformations(image)
 
+def get_cropped_patient_ids(cropped_path: str) -> List[str]:
+	# Get all the patient IDs from the cropped path
+	patient_ids = listdir(cropped_path)
+	patient_ids = [patient_id[:-2] for patient_id in patient_ids]
+	return patient_ids
+
 def get_negative_patient_ids(csv_file_path: str) -> List[str]:
 	# Gets all the patient IDs with a negative diagnosis
 	data = pd.read_csv(csv_file_path)

@@ -3,11 +3,14 @@ import torch.nn as nn
 import wandb
 import numpy as np
 import pandas as pd
+import yaml
+import os
 from sklearn.model_selection import KFold
 from train import train_ae
 from Autoencoder import Autoencoder
 from Autoencoder_big import ImprovedAutoencoder
-from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, check_red_fraction, postprocess
+from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, check_red_fraction,\
+	get_cropped_patient_ids, postprocess, get_classification_patient_ids, get_negative_patient_ids
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
@@ -59,10 +62,11 @@ def classify_patches(model, dataloader, device, threshold):
 
 def evaluate_classification(predictions, labels):
 	tn, fp, fn, tp = confusion_matrix(labels, predictions).ravel()
-	accuracy = (tp + tn) / (tp + tn + fp + fn)
-	precision = tp / (tp + fp)
-	recall = tp / (tp + fn)
-	f1_score = 2 * (precision * recall) / (precision + recall)
+	epsilon = 1e-10
+	accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)
+	precision = tp / (tp + fp + epsilon)
+	recall = tp / (tp + fn + epsilon)
+	f1_score = 2 * (precision * recall) / (precision + recall + epsilon)
 	conf_matrix = np.array([[tn, fp], [fn, tp]])
 	return accuracy, precision, recall, f1_score, conf_matrix
 
@@ -101,8 +105,19 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	print(f"Using device {device}")
 
-	# Get all negative patient IDs from Cropped
-	patient_ids = HelicoDatasetAnomalyDetection(train_ratio=1.0).patients_ids
+	# Get all patient IDs from Cropped
+	dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+	cropped_path = os.path.join(dataset_path, "CrossValidation", "Cropped")
+	crop_patient_ids = get_cropped_patient_ids(cropped_path)
+
+	# Get all negative patient IDs
+	csv_file_path = os.path.join(dataset_path, "PatientDiagnosis.csv")
+	neg_patient_ids = get_negative_patient_ids(csv_file_path)
+
+	# Get all patient IDs with their diagnosis
+	# excel_file_path = os.path.join(dataset_path, "HP_WSI-CoordAnnotatedPatches.xlsx")
+	# clas_patient_ids = get_classification_patient_ids(excel_file_path)
+	# crop_clas_patient_ids = list(set(crop_patient_ids) & set(clas_patient_ids))
 
 	# Set up KFold cross-validator
 	kf = KFold(n_splits=k, shuffle=True, random_state=42)
@@ -117,20 +132,22 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 	lst_conf_matrix_improved = []
 
 	# Loop over each fold
-	for fold, (train_index, test_index) in enumerate(kf.split(patient_ids)):
+	for fold, (train_index, test_index) in enumerate(kf.split(crop_patient_ids)):
 		print(f"\nStarting fold {fold + 1}/{k}")
 
 		# Get train and test patient IDs
-		train_patient_ids = [patient_ids[i] for i in train_index]
-		test_patient_ids = [patient_ids[i] for i in test_index]
+		train_patient_ids = [crop_patient_ids[i] for i in train_index]
+		val_patient_ids = [crop_patient_ids[i] for i in test_index]
 
 		# Create datasets for this fold
+		train_patient_ids_neg = list(set(train_patient_ids) & set(neg_patient_ids))
+		val_patient_ids_neg = list(set(val_patient_ids) & set(neg_patient_ids))
 		train_dataset_ae = HelicoDatasetAnomalyDetection(
-			patient_ids_to_include=train_patient_ids,
+			patient_ids_to_include=train_patient_ids_neg,
 			train_ratio=1.0
 		)
 		val_dataset_ae = HelicoDatasetAnomalyDetection(
-			patient_ids_to_include=test_patient_ids,
+			patient_ids_to_include=val_patient_ids_neg,
 			train_ratio=1.0
 		)
 		print(f"AE Train set size: {len(train_dataset_ae)}")
@@ -142,7 +159,7 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 		)
 		val_dataset_clas = HelicoDatasetClassification(
 			patient_id=True,
-			patient_ids_to_include=test_patient_ids,
+			patient_ids_to_include=val_patient_ids,
 			train_ratio=1.0
 		)
 		print(f"Classification Train set size: {len(train_dataset_clas)}")
