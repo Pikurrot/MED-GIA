@@ -1,15 +1,13 @@
 import torch
 import torch.nn as nn
 import wandb
-import yaml
-import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from train import train_ae
 from Autoencoder import Autoencoder
 from Autoencoder_big import ImprovedAutoencoder
-from utils import HelicoDatasetAnomalyDetection, get_negative_patient_ids, check_red_fraction, postprocess
+from utils import HelicoDatasetAnomalyDetection, HelicoDatasetClassification, check_red_fraction, postprocess
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from sklearn.metrics import roc_curve
@@ -129,21 +127,33 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 
 		# Create datasets for this fold
 		train_dataset_ae = HelicoDatasetAnomalyDetection(
-			patient_id=True,
 			patient_ids_to_include=train_patient_ids,
 			train_ratio=1.0
 		)
 		val_dataset_ae = HelicoDatasetAnomalyDetection(
+			patient_ids_to_include=test_patient_ids,
+			train_ratio=1.0
+		)
+		print(f"AE Train set size: {len(train_dataset_ae)}")
+		print(f"AE Validation set size: {len(val_dataset_ae)}")
+		train_dataset_clas = HelicoDatasetClassification(
+			patient_id=True,
+			patient_ids_to_include=train_patient_ids,
+			train_ratio=1.0
+		)
+		val_dataset_clas = HelicoDatasetClassification(
 			patient_id=True,
 			patient_ids_to_include=test_patient_ids,
 			train_ratio=1.0
 		)
-		print(f"Train set size: {len(train_dataset_ae)}")
-		print(f"Validation set size: {len(val_dataset_ae)}")
+		print(f"Classification Train set size: {len(train_dataset_clas)}")
+		print(f"Classification Validation set size: {len(val_dataset_clas)}")
 
 		# Create DataLoaders
 		train_loader_ae = DataLoader(train_dataset_ae, batch_size=256, shuffle=True)
 		val_loader_ae = DataLoader(val_dataset_ae, batch_size=256, shuffle=False)
+		train_loader_clas = DataLoader(train_dataset_clas, batch_size=256, shuffle=True)
+		val_loader_clas = DataLoader(val_dataset_clas, batch_size=256, shuffle=False)
 
 		# Loop over each model
 		for model_name, ModelClass in models.items():
@@ -179,18 +189,18 @@ def k_fold_cross_validation(k=5, num_epochs=1):
 			torch.save(model.state_dict(), model_filename)
 			wandb.save(model_filename)
 
-			# Inference on the val set
-			red_fracs, labels, patient_ids = inference_ae(model, val_loader_ae, device)
+			# Inference on the train patch classification set
+			train_red_fracs, train_labels, train_patient_ids = inference_ae(model, train_loader_clas, device)
 
 			# Find optimal threshold on red fraction
-			optimal_threshold, roc_auc = find_optimal_threshold(red_fracs, labels)
+			optimal_threshold, roc_auc = find_optimal_threshold(train_red_fracs, train_labels)
 			print(f"Optimal threshold on red fraction: {optimal_threshold}")
 			print(f"ROC AUC: {roc_auc}")
 
 			# Classify patches using the optimal threshold
-			predictions, labels, patient_ids = classify_patches(model, val_loader_ae, device, optimal_threshold)
+			predictions, labels, patient_ids = classify_patches(model, val_loader_clas, device, optimal_threshold)
 
-			# Evaluate classification
+			# Evaluate patch classification
 			_, _, _, _, conf_matrix = evaluate_classification(predictions, labels)
 			if model_name == "Autoencoder":
 				lst_conf_matrix.append(conf_matrix)
