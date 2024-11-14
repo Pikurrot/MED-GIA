@@ -104,7 +104,7 @@ def get_percentage_positive_patches(patient_ids, patch_preds, gt_patient_diagnos
 	results = pd.DataFrame({
 		"Patient ID": patient_ids,
 		"Pred Patch Class": patch_preds,
-		"GT Patient diagnosis": gt_patient_diagnosis
+		"GT patient diagnosis": gt_patient_diagnosis
 	})
 
 	# percentage of positive patches per patient
