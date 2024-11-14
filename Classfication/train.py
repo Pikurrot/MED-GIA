@@ -6,6 +6,8 @@ from model import HelicobacterClassifier
 from utils import HelicoDatasetClassification
 from sklearn.model_selection import StratifiedKFold
 from collections import Counter
+from sklearn.metrics import confusion_matrix
+import numpy as np
 
 
 def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10, patience=5, min_delta=0.01, fold=None):
@@ -32,7 +34,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
         model.train()
         total_loss = 0
         for i, data in enumerate(train_loader):
-            img, label,_ = data
+            img, label, _ = data
             img = img.to(device)
             label = label.to(device)
             optimizer.zero_grad()
@@ -66,6 +68,26 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             accuracy = 100 * correct / total
             print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Accuracy: {accuracy}%")
             wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss, "accuracy": accuracy})
+
+            # Compute confusion matrix
+            all_labels = []
+            all_predictions = []
+            with torch.no_grad():
+                for i, data in enumerate(val_loader):
+                    img, label, _ = data
+                    img = img.to(device)
+                    label = label.to(device)
+                    output = model(img)
+                    _, predicted = torch.max(output.data, 1)
+                    all_labels.extend(label.cpu().numpy())
+                    all_predictions.extend(predicted.cpu().numpy())
+
+            cm = confusion_matrix(all_labels, all_predictions)
+            print(f"Confusion Matrix:\n{cm}")
+            wandb.log({"confusion_matrix": wandb.plot.confusion_matrix(probs=None,
+                                                                       y_true=np.array(all_labels),
+                                                                       preds=np.array(all_predictions),
+                                                                       class_names=[str(i) for i in range(len(cm))])})
             
             # Early Stopping
             if avg_val_loss < best_loss - min_delta:
