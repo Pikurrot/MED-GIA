@@ -44,8 +44,9 @@ def main():
 	)
 	print(f"AE Train set size: {len(neg_cropped_dataset)}")
 	clas_annot_dataset = HelicoDatasetClassification(
+		patient_id=True,
 		patient_ids_to_include=crop_patient_ids,
-		train_ratio=1.0
+		train_ratio=1.0,
 	)
 	print(f"Classification Train set size: {len(clas_annot_dataset)}")
 	patient_ids_diag = list(set(crop_patient_ids) & set(diag_patient_ids))
