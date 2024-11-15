@@ -111,7 +111,7 @@ def main():
 		)
 
 		# Find optimal threshold on percentage of positive patches (cropped)
-		optimal_threshold_pp, roc_auc_pp = find_optimal_threshold(gt_pp_train, pred_pp_train)
+		optimal_threshold_pp, roc_auc_pp = find_optimal_threshold(pred_pp_train, gt_pp_train)
 		print(f"Optimal threshold on percentage of positive patches: {optimal_threshold_pp}")
 		print(f"ROC AUC: {roc_auc_pp}")
 
