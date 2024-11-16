@@ -126,7 +126,7 @@ def main():
 		)
 
 		# Get percentage of positive patches for each patient (holdout)
-		_, pred_pp_holdout = get_percentage_positive_patches(
+		gt_patient_diagnosis_holdout, pred_pp_holdout = get_percentage_positive_patches(
 			patient_ids_diag_holdout, pred_diag_holdout, gt_patient_diagnosis_holdout
 		)
 
