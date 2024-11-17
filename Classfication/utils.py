@@ -254,6 +254,87 @@ class HelicoDatasetClassification(Dataset):
 	
 	def __len__(self) -> int:
 		return len(self.paths_labels)
+	
+class HelicoDatasetPatientDiagnosis(Dataset):
+	def __init__(
+			self,
+			split: Literal["train", "val", "test"]="train",
+			train_ratio: float=0.8, # only for train-val, test is always the whole Holdout
+			random_seed: int=42,
+			patient_ids_to_include: Optional[List[str]]=None
+	):
+		# Initialize paths
+		path_error = ensure_dataset_path_yaml()
+		if path_error == 1:
+			print(f"Dataset path not found in config.yml. Defaulting to {default_path}")
+			if not os.path.exists(default_path):
+				raise FileNotFoundError(f"Default path {default_path} does not exist. Specify a valid path in config.yml.")
+		elif path_error == 2:
+			current_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+			raise FileNotFoundError(f"Dataset path {current_path} does not exist. Specify a valid path in config.yml.")
+		
+		self.dataset_path = yaml.safe_load(open("config.yml", "r"))["dataset_path"]
+		self.csv_file_path = os.path.join(self.dataset_path, "PatientDiagnosis.csv")
+		self.cropped_path = os.path.join(self.dataset_path, "CrossValidation", "Cropped")
+		self.holdout_path = os.path.join(self.dataset_path, "HoldOut")
+		if split == "test":
+			data_path = self.holdout_path
+			train_ratio = 0
+		else:
+			data_path = self.cropped_path
+
+		# Load the CSV file
+		csv = pd.read_csv(self.csv_file_path)
+		patients_ids = csv["CODI"].to_numpy()
+		patients_diagnosis = csv["DENSITAT"].to_numpy()
+		# remove BAIXA
+		patients_ids = patients_ids[patients_diagnosis != "BAIXA"]
+		patients_diagnosis = patients_diagnosis[patients_diagnosis != "BAIXA"]
+		# patient_diagnosis to 0 or 1
+		patients_diagnosis = [0 if diagnosis == "NEGATIVA" else 1 for diagnosis in patients_diagnosis]
+		# Build a mapping from patient_id to diagnosis
+		patient_id_to_diagnosis = dict(zip(patients_ids, patients_diagnosis))
+
+		if patient_ids_to_include is None:
+			patient_ids_to_include = patients_ids.tolist()
+
+		# Split into train and test sets
+		train_size = int(len(patient_ids_to_include) * train_ratio)
+		train_indices = np.random.RandomState(random_seed).choice(len(patient_ids_to_include), train_size, replace=False)
+		test_indices = np.array([i for i in range(len(patient_ids_to_include)) if i not in train_indices])
+		if split == "train":
+			patient_ids_to_include = [patient_ids_to_include[i] for i in train_indices]
+		else:
+			patient_ids_to_include = [patient_ids_to_include[i] for i in test_indices]
+
+		# Initialize empty lists to store valid patient data
+		valid_patient_ids = []
+		valid_patient_diagnosis = []
+		patient_paths = []
+
+		# Fetch all the patient directories and ensure alignment
+		for patient_directory in listdir(data_path):
+			for patient_id in patient_ids_to_include:
+				if patient_directory.startswith(patient_id):
+					patient_paths.append(os.path.join(data_path, patient_directory))
+					valid_patient_ids.append(patient_id)
+					valid_patient_diagnosis.append(patient_id_to_diagnosis[patient_id])
+					break
+
+		# Now, use valid_patient_ids and valid_patient_diagnosis for indexing
+		self.triplets = []  # (patch_path, patient_id, patient_diagnosis)
+		for i, patient_path in enumerate(patient_paths):
+			patches = listdir(patient_path, extension=".png")
+			for patch in patches:
+				self.triplets.append((os.path.join(patient_path, patch), valid_patient_ids[i], valid_patient_diagnosis[i]))
+
+	def __getitem__(self, index) -> Any:
+		path, patient_id, patient_diagnosis = self.triplets[index]
+		# returns (image, patient_id, patient_diagnosis)
+		return transform_image(Image.open(path).convert("RGB"), (256, 256)), patient_id, patient_diagnosis
+	
+	def __len__(self) -> int:
+		return len(self.triplets)
 
 
 if __name__ == "__main__":
