@@ -33,6 +33,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
+        misclassified_images = []
         for i, data in enumerate(train_loader):
             img, label, _ = data
             img = img.to(device)
@@ -43,9 +44,16 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            
+            # Log misclassified images
+            _, predicted = torch.max(output.data, 1)
+            misclassified_indices = (predicted != label).nonzero(as_tuple=True)[0]
+            for idx in misclassified_indices:
+                misclassified_images.append(wandb.Image(img[idx].cpu(), caption=f"True: {label[idx].item()}, Pred: {predicted[idx].item()}"))
+        
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
-        wandb.log({"epoch": epoch + 1, "loss": avg_loss})
+        wandb.log({"epoch": epoch + 1, "loss": avg_loss, "misclassified_images_train": misclassified_images})
         
         # Validation
         if val_loader is not None:
@@ -53,9 +61,10 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
             val_loss = 0
             correct = 0
             total = 0
+            misclassified_images_val = []
             with torch.no_grad():
                 for i, data in enumerate(val_loader):
-                    img, label,_ = data
+                    img, label, _ = data
                     img = img.to(device)
                     label = label.to(device)
                     output = model(img)
@@ -64,10 +73,16 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
                     _, predicted = torch.max(output.data, 1)
                     total += label.size(0)
                     correct += (predicted == label).sum().item()
+                    
+                    # Log misclassified images
+                    misclassified_indices = (predicted != label).nonzero(as_tuple=True)[0]
+                    for idx in misclassified_indices:
+                        misclassified_images_val.append(wandb.Image(img[idx].cpu(), caption=f"True: {label[idx].item()}, Pred: {predicted[idx].item()}"))
+            
             avg_val_loss = val_loss / len(val_loader)
             accuracy = 100 * correct / total
             print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Accuracy: {accuracy}%")
-            wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss, "accuracy": accuracy})
+            wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss, "accuracy": accuracy, "misclassified_images_val": misclassified_images_val})
 
             # Compute confusion matrix
             all_labels = []
