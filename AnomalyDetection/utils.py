@@ -99,7 +99,7 @@ def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
 	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
 	return patient_ids
 
-def postprocess(tensor, p=0):
+def postprocess(tensor, p=4):
 	if tensor.dim() == 4:
 		tensor = tensor.squeeze(0)
 	tensor = tensor.cpu()

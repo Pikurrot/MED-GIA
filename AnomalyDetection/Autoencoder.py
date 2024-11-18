@@ -51,7 +51,7 @@ class Autoencoder(torch.nn.Module):
 
              # (Batch_size, 16, W/2, H/2) -> (Batch_size, 3, W, H)
             nn.ConvTranspose2d(16, 3, kernel_size = 3, stride=2, padding=1, output_padding=1),
-			nn.Tanh()
+			nn.Sigmoid()
         )
     
     
