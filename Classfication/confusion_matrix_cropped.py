@@ -11,27 +11,36 @@ import seaborn as sns
 import torch
 from torch.utils.data import DataLoader
 
+# Set the device (GPU or CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+# Path to model files
 path_to_models = r"/export/fhome/vlia01/MED-GIA/Classfication/best_model_fold"
+
+# Load and transfer models to the device
+models = []
 for n in range(5):
     model = HelicobacterClassifier()
-    model.load_state_dict(torch.load(path_to_models + str(n) + ".pth"))
-    globals()[f'model_fold_{n}'] = model
+    model.load_state_dict(torch.load(f"{path_to_models}{n}.pth", map_location=device))
+    model = model.to(device)  # Move model to the appropriate device
+    model.eval()  # Set model to evaluation mode
+    models.append(model)
 
 # Ensemble voting to predict new patches
 def ensemble_predict(models, img):
-    outputs = [torch.softmax(model(img), dim=1) for model in models]  # Get probabilities [0.1,0.9]
+    img = img.to(device)  # Ensure the image is on the correct device
+    outputs = [torch.softmax(model(img), dim=1) for model in models]  # Get probabilities [0.1, 0.9]
     max_confidences = [torch.max(output).item() for output in outputs]  # Get max confidence for each model
     best_model_index = max_confidences.index(max(max_confidences))  # Find the index of the model with the highest confidence
     _, predicted = torch.max(outputs[best_model_index].data, 1)  # Get the prediction of the best model
     return predicted
 
-# Load models into a list
-models = [globals()[f'model_fold_{n}'] for n in range(5)]
-
+# Transform function for images
 def transform_image(image, size):
     return image.resize(size)
 
+# Custom Dataset for Cropped Images
 class Cropped_Dataset():
     def __init__(self):
         path_to_cropped = r"/export/fhome/vlia/HelicoDataSet/CrossValidation/Cropped"
@@ -58,9 +67,8 @@ class Cropped_Dataset():
         transformed_images = [transform_image(Image.open(image_path).convert("RGB"), (256, 256)) for image_path in images]
         return transformed_images, patient_id, patient_diagnosis
 
-cropped_dataset = Cropped_Dataset() 
-
-# Create a DataLoader for the holdout dataset
+# Load the dataset and create a DataLoader
+cropped_dataset = Cropped_Dataset()
 cropped_loader = DataLoader(cropped_dataset, batch_size=1, shuffle=False, collate_fn=lambda x: x)
 
 # Predict diagnosis for each patient using ensemble
@@ -71,12 +79,12 @@ for data in tqdm.tqdm(cropped_loader, desc="Processing patients"):
     data = data[0]  # Remove batch dimension
     images, patient_id, patient_diagnosis = data
     images = torch.stack([torchvision.transforms.ToTensor()(image) for image in images])
-    images = images.to(device)
+    images = images.to(device)  # Move images to the correct device
     
     # Predict for each image
     positive_patch_found = False
     for img in images:
-        img = img.unsqueeze(0)  # Add batch dimension
+        img = img.unsqueeze(0).to(device)  # Add batch dimension and move to device
         predicted = ensemble_predict(models, img)
         if predicted.item() == 1:  # If any patch is positive
             positive_patch_found = True
