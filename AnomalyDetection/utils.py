@@ -99,7 +99,7 @@ def get_diagnosis_patient_ids(csv_file_path: str) -> List[str]:
 	patient_ids = negative_diagnosis["CODI"].astype(str).tolist()
 	return patient_ids
 
-def postprocess(tensor, p=0):
+def postprocess(tensor, p=4):
 	if tensor.dim() == 4:
 		tensor = tensor.squeeze(0)
 	tensor = tensor.cpu()
@@ -398,11 +398,10 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 		# Fetch all the patient directories and ensure alignment
 		for patient_directory in listdir(data_path):
 			for patient_id in patient_ids_to_include:
-				if patient_directory.startswith(patient_id):
+				if patient_directory[:-2] == patient_id:
 					patient_paths.append(os.path.join(data_path, patient_directory))
 					valid_patient_ids.append(patient_id)
 					valid_patient_diagnosis.append(patient_id_to_diagnosis[patient_id])
-					break
 
 		# Now, use valid_patient_ids and valid_patient_diagnosis for indexing
 		self.triplets = []  # (patch_path, patient_id, patient_diagnosis)
@@ -410,6 +409,9 @@ class HelicoDatasetPatientDiagnosis(Dataset):
 			patches = listdir(patient_path, extension=".png")
 			for patch in patches:
 				self.triplets.append((os.path.join(patient_path, patch), valid_patient_ids[i], valid_patient_diagnosis[i]))
+
+		# Print number of distinct patients
+		print(f"Number of distinct patients: {len(set(valid_patient_ids))}, {len(set(patient_ids_to_include))}, {len(set(patients_ids))}")
 
 	def __getitem__(self, index) -> Any:
 		path, patient_id, patient_diagnosis = self.triplets[index]
