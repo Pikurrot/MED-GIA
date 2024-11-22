@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-path_to_models = r"fhome/vlia01/MED-GIA/Classfication/best_model_fold"
+path_to_models = r"export/fhome/vlia01/MED-GIA/Classfication/best_model_fold"
 for n in range(5):
     model = HelicobacterClassifier()
     model.load_state_dict(torch.load(path_to_models + str(n) + ".pth"))
@@ -34,9 +34,9 @@ def transform_image(image, size):
 
 class Cropped_Dataset():
     def __init__(self):
-        path_to_cropped = r"fhome/vlia/HelicoDataSet/CrossValidation/Cropped"
+        path_to_cropped = r"export/fhome/vlia/HelicoDataSet/CrossValidation/Cropped"
         patient_directories = [patient for patient in pathlib.Path(path_to_cropped).iterdir()]
-        path_to_Patient_Diagnois = r'fhome/vlia/HelicoDataSet/PatientDiagnosis.csv'
+        path_to_Patient_Diagnois = r'export/fhome/vlia/HelicoDataSet/PatientDiagnosis.csv'
         patient_diagnosisDF = pd.read_csv(path_to_Patient_Diagnois)
         patient_diagnosisDF = patient_diagnosisDF[(patient_diagnosisDF['DENSITAT'] == 'ALTA') | (patient_diagnosisDF['DENSITAT'] == 'NEGATIVA')]
         patient_diagnosisDF['DENSITAT'] = [1 if x == 'ALTA' else -1 for x in patient_diagnosisDF['DENSITAT']]
