@@ -109,4 +109,48 @@ sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
 plt.title('Confusion Matrix')
 plt.xlabel('Predicted label')
 plt.ylabel('True label')
-plt.savefig('confusion_matrix.png')  # Save the plot as an image file
+plt.savefig('confusion_matrix_confidence.png')  # Save the plot as an image file
+
+def ensemble_predict(models, img):
+    outputs = [torch.softmax(model(img), dim=1) for model in models] # Get probabilities [0.1,0.9]
+    outputs = torch.stack(outputs) # Stack probabilities [[0.1,0.9],[0.2,0.8]]
+    outputs = torch.mean(outputs, dim=0) # Average probabilities [0.15,0.85]
+    _, predicted = torch.max(outputs.data, 1) # Get the index of the max probability
+    return predicted
+
+# Predict diagnosis for each patient using ensemble
+predictions = []
+ground_truth = []
+
+for data in tqdm.tqdm(cropped_loader, desc="Processing patients"):
+    data = data[0]  # Remove batch dimension
+    images, patient_id, patient_diagnosis = data
+    images = torch.stack([torchvision.transforms.ToTensor()(image) for image in images])
+    images = images.to(device)  # Move images to the correct device
+    
+    # Predict for each image
+    positive_patch_found = False
+    for img in images:
+        img = img.unsqueeze(0).to(device)  # Add batch dimension and move to device
+        predicted = ensemble_predict(models, img)
+        if predicted.item() == 1:  # If any patch is positive
+            positive_patch_found = True
+            break
+    
+    # If a positive patch is found, the diagnosis is positive (1), otherwise negative (-1)
+    final_prediction = 1 if positive_patch_found else -1
+    predictions.append(final_prediction)
+    ground_truth.append(patient_diagnosis[0].item())
+
+# Compute confusion matrix
+conf_matrix = confusion_matrix(ground_truth, predictions)
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Plot confusion matrix
+plt.figure(figsize=(10, 7))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted label')
+plt.ylabel('True label')
+plt.savefig('confusion_matrix_average.png')  # Save the plot as an image file
