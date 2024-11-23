@@ -43,11 +43,14 @@ def transform_image(image, size):
 # Custom Dataset for Cropped Images
 class Cropped_Dataset():
     def __init__(self):
+        path_to_annotated_xlsf = r"/export/fhome/vlia/HelicoDataSet/HP_WSI-CoordAnnotatedPatches.xlsx"
         path_to_cropped = r"/export/fhome/vlia/HelicoDataSet/CrossValidation/Cropped"
         patient_directories = [patient for patient in pathlib.Path(path_to_cropped).iterdir()]
         path_to_Patient_Diagnois = r'/export/fhome/vlia/HelicoDataSet/PatientDiagnosis.csv'
         patient_diagnosisDF = pd.read_csv(path_to_Patient_Diagnois)
-        patient_diagnosisDF = patient_diagnosisDF[(patient_diagnosisDF['DENSITAT'] == 'ALTA') | (patient_diagnosisDF['DENSITAT'] == 'NEGATIVA')]
+        annotated_DF = pd.read_excel(path_to_annotated_xlsf)
+
+        patient_diagnosisDF = patient_diagnosisDF[(patient_diagnosisDF['DENSITAT'] == 'ALTA') | (patient_diagnosisDF['DENSITAT'] == 'NEGATIVA') and not (patient_diagnosisDF['CODI'].isin(annotated_DF['Pat_ID']))]
         patient_diagnosisDF['DENSITAT'] = [1 if x == 'ALTA' else -1 for x in patient_diagnosisDF['DENSITAT']]
         patient_diagnosisDF = patient_diagnosisDF.rename(columns={'DENSITAT': 'DiagnosisGT'})
         
