@@ -8,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 from collections import Counter
 from sklearn.metrics import confusion_matrix
 import numpy as np
-
+wandb_key = ""
 
 def train(model, loss_function, optimizer, train_loader, val_loader, device, num_epochs=10, patience=5, min_delta=0.01, fold=None):
     """
@@ -125,7 +125,7 @@ def train(model, loss_function, optimizer, train_loader, val_loader, device, num
 
 if __name__ == "__main__":
     # Initialize wandb
-    wandb.login(key="07313fef21f9b32f2fb1fb00a2672258c8b5c3d4")
+    wandb.login(key=wandb_key)
     wandb.init(project="MED-GIA")
     
     # Set hyperparameters
